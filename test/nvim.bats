@@ -34,8 +34,17 @@ nvim_step() {
 }
 
 @test "the vendored nvim config carries no operational state" {
-  [ ! -d "$DOTFILES_ROOT/config/nvim/.omc" ]
+  # Asserts nothing is *tracked*, not that nothing exists on disk: any tool run
+  # with a cwd inside this directory can drop state here at any moment (OMC writes
+  # .omc/state relative to cwd). Presence is harmless while .gitignore holds; a
+  # tracked file is the actual defect.
+  run bash -c "cd '$DOTFILES_ROOT' && git ls-files config/nvim | grep -E '(^|/)\.(omc|git)/'"
+  [ "$status" -ne 0 ]
+  # a nested git repo would break the packaging outright, so that must not exist
   [ ! -d "$DOTFILES_ROOT/config/nvim/.git" ]
+  # and .omc must stay ignored, or the above could start passing silently
+  run bash -c "cd '$DOTFILES_ROOT' && git check-ignore -q config/nvim/.omc/"
+  [ "$status" -eq 0 ]
 }
 
 @test "step_nvim links ~/.config/nvim to the repo copy" {
