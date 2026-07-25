@@ -45,13 +45,13 @@ effect. That is the deliberate cost of keeping runtime writes out of git.
 
 | Component | Detail |
 |---|---|
-| Dependencies | Homebrew on both platforms: zsh, tmux, git, neovim, node |
+| Dependencies | Homebrew on both platforms: zsh, tmux, git, neovim, node, jq, rust |
 | Fonts | JetBrainsMono Nerd Font v3.4.0, all variants |
 | zsh | oh-my-zsh, `robbyrussell`, `plugins=(git)` |
 | tmux | oh-my-tmux pinned to `af33f07`, tpm, tmux-agent-indicator, extrakto |
 | Neovim | NvChad v2.5, plugins restored from `lazy-lock.json` |
 | Claude Code | CLI, `settings.json`, `CLAUDE.md`, OMC HUD, 61 skills (59 linked) |
-| context-manager | `config.toml` only — the daemon is built from its own repo (see below) |
+| context-manager | `config.toml`, plus the daemon itself: cloned and built from its own repo (Linux only) |
 
 Backups of anything displaced go to `~/.dotfiles-backup/<timestamp>/`. Nothing is
 ever deleted or overwritten in place.
@@ -75,11 +75,22 @@ a fresh one before it exhausts its context window: past a threshold it asks the
 live session to write a handoff document, then replaces it in the same tmux pane
 with a new session seeded from that document.
 
-Only `config.toml` is tracked here. The `context-managerd` and `cm-hook` binaries
-are Rust and live in their own repo, so this installer packages no compiled
-artifacts — it seeds the config, reports whether the daemon is installed and
-running, and leaves the build to that repo's `deploy/install.sh`. The
-`SessionStart`/`SessionEnd` hooks the daemon needs are already in
+This is the one component built from source. The `context-managerd` and `cm-hook`
+binaries are Rust and live in their own repo, so the step clones (or
+fast-forwards) that repo into `~/src/context-manager` and delegates to its
+`deploy/install.sh`, which builds, installs the binaries, and enables the
+systemd user service. Delegating rather than reimplementing keeps the two from
+drifting. Override the source location with `CM_SRC_DIR` and the origin with
+`CM_REPO_URL`.
+
+That makes `cargo` a build dependency, so the Brewfile now carries `rust` (a
+rustup toolchain already on the machine is preferred and used instead). A missing
+toolchain or an unreachable remote is reported as a follow-up, not a hard
+failure: the config is still seeded and the rest of the install completes.
+
+The step is **Linux-only** — the daemon runs as a `systemd --user` service, which
+macOS has no equivalent of — and is a clean no-op on macOS. The
+`SessionStart`/`SessionEnd` hooks the daemon needs ship in
 `claude/settings.json`, so a machine without the binaries is simply unmanaged
 rather than broken.
 
