@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-24
 **Status:** Approved
-**Repo:** `~/dotfiles` (local only; not pushed to any remote)
+**Repo:** `~/dotfiles` (`origin`: `git@github.com:alberttluo/dotfiles.git`)
 
 ## Goal
 

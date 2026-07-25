@@ -79,6 +79,10 @@ platform-divergent branches: the Homebrew prefix (`/opt/homebrew` vs
 `/usr/local`), the font destination (`~/Library/Fonts`), and whether `fc-cache`
 runs. Use `--dry-run` on a Mac first.
 
-## Never push
+## Remote
 
-This repo has no remote by design.
+`origin` is `git@github.com:alberttluo/dotfiles.git`.
+
+Note that `home/.zshrc.local.example` and the design docs reference internal
+infrastructure — a license server host, a project codename, and local Windows
+paths. Keep this repository private, or scrub those before making it public.
