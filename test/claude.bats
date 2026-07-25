@@ -51,12 +51,31 @@ claude_step() {
   ! grep -q '/home/alluo/.nvm' "$DOTFILES_ROOT/claude/.omc-config.json.template"
 }
 
-@test "step_claude links settings.json and CLAUDE.md" {
+@test "step_claude links CLAUDE.md but COPIES settings.json" {
   stub_command claude 0 "1.0.0"
   stub_command npm 0
   run claude_step "step_claude"
-  [ -L "$HOME/.claude/settings.json" ]
   [ -L "$HOME/.claude/CLAUDE.md" ]
+  [ -f "$HOME/.claude/settings.json" ]
+  [ ! -L "$HOME/.claude/settings.json" ]
+}
+
+@test "Claude Code writing to settings.json cannot modify the repo" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  run claude_step "step_claude"
+  # simulate what Claude Code does when the user accepts dangerous mode
+  python3 - "$HOME/.claude/settings.json" <<'PY2'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d["skipDangerousModePermissionPrompt"]=True
+json.dump(d,open(p,"w"),indent=2)
+PY2
+  run jq -e 'has("skipDangerousModePermissionPrompt")' "$HOME/.claude/settings.json"
+  [ "$status" -eq 0 ]
+  # the repo copy must be untouched
+  run jq -e 'has("skipDangerousModePermissionPrompt")' "$DOTFILES_ROOT/claude/settings.json"
+  [ "$status" -ne 0 ]
 }
 
 @test "step_claude COPIES hud so runtime cache cannot reach the repo" {

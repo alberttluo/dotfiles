@@ -122,7 +122,13 @@ so the setting cannot silently land on a shared or production host.
 Vendored in the repo:
 
 - `settings.json` — with the agent-indicator hook paths changed from `~/.tmux/plugins/...` to the
-  XDG location (see "tmux plugin directory" below)
+  XDG location (see "tmux plugin directory" below).
+  **Installed by copy, not symlink** (revised 2026-07-25): Claude Code writes to
+  `settings.json` at runtime — theme, model, plugin state, and
+  `skipDangerousModePermissionPrompt`. While it was symlinked, the application
+  wrote the permission bypass straight into this repo and it was committed and
+  pushed before the test suite caught it. Copying confines runtime writes to
+  `~/.claude`.
 - `CLAUDE.md`
 - `.omc-config.json.template`
 - `hud/` — the 5 real files (`omc-hud-cache.sh`, `find-node.sh`, `omc-hud.mjs`,

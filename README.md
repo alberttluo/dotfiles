@@ -31,6 +31,16 @@ The same split applies to Claude Code: `settings.json` is shared,
 deliberately *not* in the shared settings, so a fresh machine starts with
 permission prompts enabled.
 
+### Linked vs copied
+
+| Installed by | Files | Why |
+|---|---|---|
+| symlink | `.zshrc`, `.zshenv`, `tmux.conf.local`, `config/nvim`, `CLAUDE.md` | Author-edited only. Edits in the repo take effect immediately. |
+| copy | `claude/settings.json`, `claude/hud/` | **The application writes to these.** Claude Code persists theme, model, and permission state into `settings.json`; the HUD writes per-session cache into `hud/cache/`. Symlinking them makes the repo the write target for runtime state — which silently re-added a per-host permission bypass to this repo once. |
+
+Changing a copied file in the repo needs `./install.sh --only 60-claude` to take
+effect. That is the deliberate cost of keeping runtime writes out of git.
+
 ## What gets installed
 
 | Component | Detail |
@@ -45,6 +55,18 @@ permission prompts enabled.
 Backups of anything displaced go to `~/.dotfiles-backup/<timestamp>/`. Nothing is
 ever deleted or overwritten in place.
 
+### A note on tmux config paths
+
+oh-my-tmux resolves its config as the first existing of `~/.tmux.conf`,
+`$XDG_CONFIG_HOME/tmux/tmux.conf`, `~/.config/tmux/tmux.conf`, then derives
+`TMUX_CONF_LOCAL` as `"$TMUX_CONF.local"`. Two consequences the installer handles
+explicitly, because getting either wrong yields a stock-looking tmux while every
+other component installs perfectly:
+
+- A leftover `~/.tmux.conf` outranks the XDG path, so it is moved to the backup
+  directory along with any `~/.tmux.conf.local`.
+- `XDG_CONFIG_HOME` is honoured rather than assuming `~/.config`.
+
 ## Layout
 
 | Path | Purpose |
@@ -55,7 +77,7 @@ ever deleted or overwritten in place.
 | `install/` | One file per step, `00-preflight` through `70-skills` |
 | `home/` | zsh config plus the per-host example |
 | `config/` | tmux and Neovim config |
-| `claude/` | Claude Code settings, CLAUDE.md, HUD (HUD is copied, not linked) |
+| `claude/` | Claude Code settings, CLAUDE.md, HUD |
 | `agents/` | Vendored skills tree, lock file, link manifest |
 | `test/` | bats suites, Rocky 9 integration test |
 | `docs/superpowers/` | Design spec and implementation plan |

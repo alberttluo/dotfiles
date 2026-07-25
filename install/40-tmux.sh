@@ -10,7 +10,11 @@ OH_MY_TMUX_COMMIT="af33f07"
 
 step_tmux() {
   local omt="$HOME/.local/share/tmux/oh-my-tmux"
-  local tmux_dir="$HOME/.config/tmux"
+  # Honour XDG_CONFIG_HOME. oh-my-tmux resolves its config as the first existing
+  # of $HOME/.tmux.conf, $XDG_CONFIG_HOME/tmux/tmux.conf, $HOME/.config/tmux/tmux.conf
+  # — so hardcoding ~/.config writes to a path tmux never reads when that variable
+  # points elsewhere.
+  local tmux_dir="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
   local plugin_dir="$tmux_dir/plugins"
 
   if [ -d "$omt/.git" ]; then
@@ -28,6 +32,17 @@ step_tmux() {
     log_dry "link tmux.conf and tmux.conf.local, install tpm and plugins"
     return 0
   fi
+
+  # A leftover ~/.tmux.conf outranks the XDG path in oh-my-tmux's search order,
+  # and TMUX_CONF_LOCAL is derived as "$TMUX_CONF.local". Left in place it silently
+  # disables the packaged config: tmux starts unthemed while every other component
+  # installs correctly. Move it aside rather than fight it.
+  local legacy
+  for legacy in "$HOME/.tmux.conf" "$HOME/.tmux.conf.local"; do
+    if [ -e "$legacy" ] || [ -L "$legacy" ]; then
+      _displace "$legacy"
+    fi
+  done
 
   run mkdir -p "$tmux_dir"
   backup_and_link "$omt/.tmux.conf" "$tmux_dir/tmux.conf" || return 1

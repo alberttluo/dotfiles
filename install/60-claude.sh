@@ -19,7 +19,13 @@ step_claude() {
   fi
 
   run mkdir -p "$HOME/.claude"
-  backup_and_link "$DOTFILES_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || return 1
+  # COPIED, not linked. Claude Code writes to settings.json at runtime (theme,
+  # model, skipDangerousModePermissionPrompt, plugin state), so a symlink lets the
+  # application mutate tracked config — which silently re-added a per-host
+  # permission bypass to this repo once already.
+  backup_and_copy "$DOTFILES_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || return 1
+  # CLAUDE.md is author-edited only, so linking is correct: edits in the repo take
+  # effect immediately and nothing writes to it behind your back.
   backup_and_link "$DOTFILES_ROOT/claude/CLAUDE.md"     "$HOME/.claude/CLAUDE.md"     || return 1
   # COPIED, not linked. The HUD writes per-session cache into hud/cache/, so a
   # symlink would make the repo the write target for runtime state.

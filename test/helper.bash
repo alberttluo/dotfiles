@@ -8,6 +8,8 @@ setup_common() {
   export STUB_BIN="$TEST_TMP/stubbin"
   mkdir -p "$STUB_BIN"
   export PATH="$STUB_BIN:$PATH"
+  # Unset so tests do not depend on the developer's XDG configuration.
+  unset XDG_CONFIG_HOME
   export STUB_LOG="$TEST_TMP/stub.log"
   : > "$STUB_LOG"
   DOTFILES_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"

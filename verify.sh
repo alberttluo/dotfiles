@@ -17,6 +17,10 @@ fi
 
 FAILURES=0
 
+# Same resolution oh-my-tmux uses; hardcoding ~/.config would pass on precisely
+# the machine where the packaged config is being ignored.
+TMUX_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+
 # check DESCRIPTION COMMAND... — never aborts, so one failure cannot mask others.
 check() {
   local desc=$1
@@ -53,8 +57,24 @@ _font_count() {
 
 _tmux_parses() {
   local session="_verify_$$"
-  tmux -f "$HOME/.config/tmux/tmux.conf" new-session -d -s "$session" \
+  tmux -f "$TMUX_DIR/tmux.conf" new-session -d -s "$session" \
     && tmux kill-session -t "$session"
+}
+
+# ~/.tmux.conf outranks the XDG path in oh-my-tmux's search order, and
+# TMUX_CONF_LOCAL is derived as "$TMUX_CONF.local". If it exists, the packaged
+# config is being ignored no matter how correct the XDG symlinks look.
+_no_shadowing_tmux_conf() {
+  [ ! -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]
+}
+
+# The config tmux will actually load must have its .local sibling present.
+_tmux_conf_local_resolves() {
+  local conf
+  conf="$(for c in "$HOME/.tmux.conf" "$TMUX_DIR/tmux.conf" "$HOME/.config/tmux/tmux.conf"; do
+    [ -f "$c" ] && printf '%s' "$c" && break
+  done)"
+  [ -n "$conf" ] && [ -e "$conf.local" ]
 }
 
 # Stock tmux values. If the status bar still shows these, oh-my-tmux loaded its
@@ -99,6 +119,11 @@ _no_state_linked() {
   return 0
 }
 
+# Claude Code writes to settings.json, so it must not be a symlink into the repo.
+_settings_is_copy() {
+  [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" ]
+}
+
 _omc_node_ok() {
   local n
   n="$(jq -r '.nodeBinary' "$HOME/.claude/.omc-config.json" 2>/dev/null)"
@@ -120,13 +145,15 @@ check ".zshrc.local exists"                         test -f "$HOME/.zshrc.local"
 
 printf '\n──────── tmux ────────\n'
 check "tmux is installed"                           command -v tmux
-check ".config/tmux/tmux.conf resolves"             test -e "$HOME/.config/tmux/tmux.conf"
-check "tmux.conf.local is linked"                   test -L "$HOME/.config/tmux/tmux.conf.local"
+check "tmux.conf resolves in the XDG config dir"    test -e "$TMUX_DIR/tmux.conf"
+check "tmux.conf.local is linked"                   test -L "$TMUX_DIR/tmux.conf.local"
+check "no shadowing ~/.tmux.conf"                  _no_shadowing_tmux_conf
+check "the loaded tmux.conf has its .local sibling"  _tmux_conf_local_resolves
 check "tmux config parses"                          _tmux_parses
 check "oh-my-tmux theme actually applied"           _tmux_themed
-check "tpm is installed (XDG path)"                 test -d "$HOME/.config/tmux/plugins/tpm"
-check "tmux-agent-indicator is installed"           test -d "$HOME/.config/tmux/plugins/tmux-agent-indicator"
-check "extrakto is installed"                       test -d "$HOME/.config/tmux/plugins/extrakto"
+check "tpm is installed (XDG path)"                 test -d "$TMUX_DIR/plugins/tpm"
+check "tmux-agent-indicator is installed"           test -d "$TMUX_DIR/plugins/tmux-agent-indicator"
+check "extrakto is installed"                       test -d "$TMUX_DIR/plugins/extrakto"
 
 printf '\n──────── fonts ────────\n'
 check "JetBrainsMono Nerd Font present"             _font_count
@@ -138,7 +165,7 @@ check "nvim starts headless cleanly"                nvim --headless +qa
 
 printf '\n──────── claude code ────────\n'
 check "claude CLI is installed"                     command -v claude
-check "settings.json is linked"                     test -L "$HOME/.claude/settings.json"
+check "settings.json is a copy, not a repo symlink"  _settings_is_copy
 check "settings.json is valid JSON"                 jq -e . "$HOME/.claude/settings.json"
 check "CLAUDE.md is linked"                         test -L "$HOME/.claude/CLAUDE.md"
 check "hud script is executable"                    test -x "$HOME/.claude/hud/omc-hud-cache.sh"

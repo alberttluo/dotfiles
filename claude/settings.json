@@ -99,6 +99,5 @@
   },
   "effortLevel": "medium",
   "theme": "dark",
-  "teammateMode": "tmux",
-  "skipDangerousModePermissionPrompt": true
+  "teammateMode": "tmux"
 }
