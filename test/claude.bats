@@ -51,13 +51,32 @@ claude_step() {
   ! grep -q '/home/alluo/.nvm' "$DOTFILES_ROOT/claude/.omc-config.json.template"
 }
 
-@test "step_claude links settings.json, CLAUDE.md and hud" {
+@test "step_claude links settings.json and CLAUDE.md" {
   stub_command claude 0 "1.0.0"
   stub_command npm 0
   run claude_step "step_claude"
   [ -L "$HOME/.claude/settings.json" ]
   [ -L "$HOME/.claude/CLAUDE.md" ]
-  [ -L "$HOME/.claude/hud" ]
+}
+
+@test "step_claude COPIES hud so runtime cache cannot reach the repo" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  run claude_step "step_claude"
+  [ -d "$HOME/.claude/hud" ]
+  [ ! -L "$HOME/.claude/hud" ]
+  [ -x "$HOME/.claude/hud/omc-hud-cache.sh" ]
+  [ -f "$HOME/.claude/hud/lib/config-dir.sh" ]
+}
+
+@test "writing to the installed hud cache does not touch the repo" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  run claude_step "step_claude"
+  # simulate what the HUD does at runtime
+  mkdir -p "$HOME/.claude/hud/cache"
+  printf 'session state\n' > "$HOME/.claude/hud/cache/statusline.test.txt"
+  [ ! -e "$DOTFILES_ROOT/claude/hud/cache/statusline.test.txt" ]
 }
 
 @test "step_claude renders the node path into .omc-config.json" {

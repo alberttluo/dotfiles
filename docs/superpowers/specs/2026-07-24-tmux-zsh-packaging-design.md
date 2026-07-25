@@ -126,7 +126,13 @@ Vendored in the repo:
 - `CLAUDE.md`
 - `.omc-config.json.template`
 - `hud/` — the 5 real files (`omc-hud-cache.sh`, `find-node.sh`, `omc-hud.mjs`,
-  `lib/config-dir.sh`, `lib/config-dir.mjs`), excluding `cache/`
+  `lib/config-dir.sh`, `lib/config-dir.mjs`), excluding `cache/`.
+  **Installed by copy, not symlink** (revised 2026-07-25): the HUD writes
+  per-session cache into `hud/cache/`, so linking the directory would make the
+  repo the write target for runtime state — a direct violation of the
+  "machine state never enters the repo" rule. Copying keeps the cache in
+  `~/.claude/hud/cache`. The cost is that a change to the vendored HUD needs
+  `./install.sh --only 60-claude` to propagate.
 - All 61 skills, vendored wholesale (see "Skills" below)
 
 Re-fetched on first launch:
@@ -197,7 +203,7 @@ Homebrew's prerequisites (`gcc`, `curl`, `file`) are installed.
 | `30-zsh` | oh-my-zsh unattended (`RUNZSH=no CHSH=no KEEP_ZSHRC=yes`); link `.zshrc`, `.zshenv`; seed `~/.zshrc.local` from example if absent; attempt `chsh` | hard fail except `chsh` |
 | `40-tmux` | clone `gpakosz/.tmux` @ `af33f07` to `~/.local/share/tmux/oh-my-tmux`; symlink `~/.config/tmux/tmux.conf` → it; link `tmux.conf.local`; clone tpm; run `tpm/bin/install_plugins` | warn on plugin install |
 | `50-nvim` | link `~/.config/nvim`; `nvim --headless "+Lazy! restore" +qa` | warn |
-| `60-claude` | install Claude Code (`npm install -g @anthropic-ai/claude-code`, using the Homebrew node from `10-packages`); link `settings.json`, `CLAUDE.md`, `hud/`; render `.omc-config.json` from template; seed `settings.local.json` from example | hard fail |
+| `60-claude` | install Claude Code (`npm install -g @anthropic-ai/claude-code`, using the Homebrew node from `10-packages`); link `settings.json` and `CLAUDE.md`; **copy** `hud/`; render `.omc-config.json` from template; seed `settings.local.json` from example | hard fail |
 | `70-skills` | copy `agents/skills/` → `~/.agents/skills/` and the lock file → `~/.agents/.skill-lock.json`; recreate the 59 symlinks in `~/.claude/skills` from `CLAUDE-SKILL-LINKS.txt` | warn |
 
 `Lazy! restore` rather than `Lazy! sync` — restore honors `lazy-lock.json`, so plugin versions

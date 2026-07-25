@@ -21,7 +21,9 @@ step_claude() {
   run mkdir -p "$HOME/.claude"
   backup_and_link "$DOTFILES_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || return 1
   backup_and_link "$DOTFILES_ROOT/claude/CLAUDE.md"     "$HOME/.claude/CLAUDE.md"     || return 1
-  backup_and_link "$DOTFILES_ROOT/claude/hud"           "$HOME/.claude/hud"           || return 1
+  # COPIED, not linked. The HUD writes per-session cache into hud/cache/, so a
+  # symlink would make the repo the write target for runtime state.
+  backup_and_copy "$DOTFILES_ROOT/claude/hud"           "$HOME/.claude/hud"           || return 1
 
   node_bin="$(command -v node || true)"
   if [ -z "$node_bin" ]; then

@@ -55,7 +55,7 @@ ever deleted or overwritten in place.
 | `install/` | One file per step, `00-preflight` through `70-skills` |
 | `home/` | zsh config plus the per-host example |
 | `config/` | tmux and Neovim config |
-| `claude/` | Claude Code settings, CLAUDE.md, HUD |
+| `claude/` | Claude Code settings, CLAUDE.md, HUD (HUD is copied, not linked) |
 | `agents/` | Vendored skills tree, lock file, link manifest |
 | `test/` | bats suites, Rocky 9 integration test |
 | `docs/superpowers/` | Design spec and implementation plan |

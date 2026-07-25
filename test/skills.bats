@@ -96,3 +96,35 @@ skills_step() {
   [ "$status" -eq 0 ]
   [ ! -d "$HOME/.agents/skills" ]
 }
+
+@test "step_skills reports the manifest count, not the directory count" {
+  run skills_step "step_skills"
+  # an unrelated directory alongside the links must not inflate the report
+  mkdir -p "$HOME/.claude/skills/.omc"
+  run skills_step "step_skills"
+  [[ "$output" == *"linked 59 skills"* ]]
+}
+
+@test "verify _skills_linked tolerates unrelated entries in ~/.claude/skills" {
+  run skills_step "step_skills"
+  mkdir -p "$HOME/.claude/skills/.omc"
+  run bash -c "
+    source '$DOTFILES_ROOT/lib/log.sh'
+    VERIFY_ROOT='$DOTFILES_ROOT'
+    source '$DOTFILES_ROOT/verify.sh' --source-only
+    _skills_linked
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "verify _skills_linked fails when a manifest skill is missing its link" {
+  run skills_step "step_skills"
+  rm -f "$HOME/.claude/skills/caveman"
+  run bash -c "
+    source '$DOTFILES_ROOT/lib/log.sh'
+    VERIFY_ROOT='$DOTFILES_ROOT'
+    source '$DOTFILES_ROOT/verify.sh' --source-only
+    _skills_linked
+  "
+  [ "$status" -ne 0 ]
+}

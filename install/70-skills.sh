@@ -37,7 +37,9 @@ step_skills() {
     ln -sfn "$target" "$linkdir/$name" || { log_warn "could not link skill $name"; rc=2; }
   done < "$DOTFILES_ROOT/agents/CLAUDE-SKILL-LINKS.txt"
 
-  count="$(find "$linkdir" -maxdepth 1 -mindepth 1 | wc -l | tr -d ' ')"
+  # Count the manifest, not the directory: unrelated entries live here too
+  # (OMC keeps an .omc state directory under ~/.claude/skills).
+  count="$(grep -c '[^[:space:]]' "$DOTFILES_ROOT/agents/CLAUDE-SKILL-LINKS.txt")"
   log_ok "linked $count skills into $linkdir"
   return $rc
 }
