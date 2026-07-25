@@ -20,6 +20,26 @@ FAILURES=0
 # Same resolution oh-my-tmux uses; hardcoding ~/.config would pass on precisely
 # the machine where the packaged config is being ignored.
 TMUX_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+CM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/context-manager/config.toml"
+
+# Cheap TOML sanity check: the daemon reads this file at startup and a syntax
+# error there means no session management at all. No toml CLI is guaranteed, so
+# assert the shape of the keys the daemon requires rather than full parsing.
+_cm_config_parses() {
+  [ -f "$CM_CONFIG" ] || return 1
+  grep -qE '^threshold *= *[0-9.]+' "$CM_CONFIG" || return 1
+  grep -qE '^dry_run *= *(true|false)' "$CM_CONFIG" || return 1
+  grep -q '^\[model_windows\]' "$CM_CONFIG" || return 1
+  # An unterminated array is the realistic hand-edit failure.
+  grep -q '^]' "$CM_CONFIG"
+}
+
+_cm_hook_wired() {
+  jq -e '
+    ([.hooks.SessionStart[]?.hooks[]?.command] | any(test("cm-hook"))) and
+    ([.hooks.SessionEnd[]?.hooks[]?.command]   | any(test("cm-hook")))
+  ' "$HOME/.claude/settings.json" >/dev/null 2>&1
+}
 
 # check DESCRIPTION COMMAND... — never aborts, so one failure cannot mask others.
 check() {
@@ -173,6 +193,21 @@ check ".omc-config.json node path is valid"         _omc_node_ok
 check "all 59 manifest skills are linked"           _skills_linked
 check "pdf is not linked into Claude Code"          test '!' -e "$HOME/.claude/skills/pdf"
 check "no machine state is linked"                  _no_state_linked
+
+printf '\n──────── context-manager ────────\n'
+check "config.toml exists"                          test -f "$CM_CONFIG"
+check "config.toml parses as TOML"                  _cm_config_parses
+check "cwd exclusions are configured"               grep -q '^ignore_cwds = \[' "$CM_CONFIG"
+check "cm-hook is wired into settings.json"         _cm_hook_wired
+# Reported, not required: the daemon is built from a separate repo, so a machine
+# can be fully provisioned by this installer and still not run it.
+if [ -x "$HOME/.local/bin/context-managerd" ]; then
+  check "context-managerd is installed"             test -x "$HOME/.local/bin/context-managerd"
+  check "cm-hook is installed"                      test -x "$HOME/.local/bin/cm-hook"
+  check "the service is active"                     systemctl --user is-active --quiet context-manager
+else
+  printf '  · context-manager daemon not installed (optional) — skipped\n'
+fi
 
 printf '\n'
 if [ "$FAILURES" -eq 0 ]; then

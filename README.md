@@ -51,6 +51,7 @@ effect. That is the deliberate cost of keeping runtime writes out of git.
 | tmux | oh-my-tmux pinned to `af33f07`, tpm, tmux-agent-indicator, extrakto |
 | Neovim | NvChad v2.5, plugins restored from `lazy-lock.json` |
 | Claude Code | CLI, `settings.json`, `CLAUDE.md`, OMC HUD, 61 skills (59 linked) |
+| context-manager | `config.toml` only — the daemon is built from its own repo (see below) |
 
 Backups of anything displaced go to `~/.dotfiles-backup/<timestamp>/`. Nothing is
 ever deleted or overwritten in place.
@@ -67,6 +68,27 @@ other component installs perfectly:
   directory along with any `~/.tmux.conf.local`.
 - `XDG_CONFIG_HOME` is honoured rather than assuming `~/.config`.
 
+### A note on context-manager
+
+`context-manager` is a user-level daemon that hands a Claude Code session off to
+a fresh one before it exhausts its context window: past a threshold it asks the
+live session to write a handoff document, then replaces it in the same tmux pane
+with a new session seeded from that document.
+
+Only `config.toml` is tracked here. The `context-managerd` and `cm-hook` binaries
+are Rust and live in their own repo, so this installer packages no compiled
+artifacts — it seeds the config, reports whether the daemon is installed and
+running, and leaves the build to that repo's `deploy/install.sh`. The
+`SessionStart`/`SessionEnd` hooks the daemon needs are already in
+`claude/settings.json`, so a machine without the binaries is simply unmanaged
+rather than broken.
+
+`config.toml` is **seeded, not overwritten**: `ignore_cwds` holds machine-specific
+paths and the thresholds are tuned against a live machine, so the step never
+clobbers an existing file and instead warns when it has drifted from the tracked
+copy. `ignore_cwds` matching is a plain substring test, so one ancestor path
+excludes every project beneath it.
+
 ## Layout
 
 | Path | Purpose |
@@ -74,9 +96,9 @@ other component installs perfectly:
 | `install.sh` | Entrypoint: flags, step ordering, dispatch, summary |
 | `verify.sh` | Post-install assertions, runnable standalone |
 | `lib/` | `log.sh` (output + dry-run), `os.sh` (OS/brew), `link.sh` (backup+symlink) |
-| `install/` | One file per step, `00-preflight` through `70-skills` |
+| `install/` | One file per step, `00-preflight` through `80-context-manager` |
 | `home/` | zsh config plus the per-host example |
-| `config/` | tmux and Neovim config |
+| `config/` | tmux, Neovim, and context-manager config |
 | `claude/` | Claude Code settings, CLAUDE.md, HUD |
 | `agents/` | Vendored skills tree, lock file, link manifest |
 | `test/` | bats suites, Rocky 9 integration test |

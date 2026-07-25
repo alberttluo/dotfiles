@@ -26,6 +26,7 @@ STEP_IDS=(
   "50-nvim:step_nvim"
   "60-claude:step_claude"
   "70-skills:step_skills"
+  "80-context-manager:step_context_manager"
 )
 
 usage() {
@@ -38,7 +39,7 @@ Usage: ./install.sh [options]
   --help          Show this message
 
 Steps run in order: 00-preflight 10-packages 20-fonts 30-zsh 40-tmux 50-nvim
-                    60-claude 70-skills
+                    60-claude 70-skills 80-context-manager
 EOF
 }
 

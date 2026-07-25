@@ -1,0 +1,39 @@
+# context-manager — hands a Claude Code session off to a fresh one before it
+# runs out of context. Read-only for the daemon; nothing writes back to it.
+#
+# The daemon and its cm-hook binary are built from the separate context-manager
+# repo and are NOT packaged here (Rust toolchain + a release build). This file is
+# tracked so a fresh machine starts from known-good tuning rather than the
+# installer's dry-run defaults.
+
+threshold = 0.45            # fraction of the model's context window
+quiet_period_secs = 45      # session must be idle this long before handing off
+grace_secs = 10             # warning window; typing in it defers the handoff
+cooldown_secs = 240         # minimum gap between handoffs of one session
+poll_interval_secs = 3
+handoff_timeout_secs = 180  # budget for the session to write its handoff doc
+discovery_interval_secs = 15
+dry_run = false
+
+# Sessions whose cwd matches any entry are never managed.
+#
+# Everything under this Windows mount is excluded: handing those sessions off
+# drives file lookups across the 9p transport, which is a single serialized fd
+# pair. A burst of concurrent handoffs there wedged the Windows-side plan9 server
+# on 2026-07-24 and soft-locked the VM. This also covers the context-manager
+# project itself, so the orchestrator never hands off the session working on it.
+#
+# Matching is a plain substring test (`cwd.contains(entry)`), applied in both the
+# discovery scan and the daemon's per-session gate, so one ancestor path covers
+# every project beneath it — no need to enumerate them. Widen to "/mnt/c" to
+# exclude all Windows mounts.
+ignore_cwds = [
+  "/mnt/c/Users/Albert Luo",
+]
+
+# Context window per model. `default` applies to anything unlisted; the daemon
+# also raises its estimate empirically when it observes a larger window in use.
+[model_windows]
+default = 200000
+"claude-opus-4-8" = 1000000
+"claude-opus-4-7" = 1000000
