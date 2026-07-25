@@ -1,0 +1,50 @@
+# Per-host configuration. Copied to ~/.zshrc.local on first install and never
+# tracked by git. Everything here is commented out — uncomment and correct the
+# paths for the machine you are on.
+
+# --- ssh-agent --------------------------------------------------------------
+# Reuses a running agent instead of spawning one per shell (the original config
+# ran `eval "$(ssh-agent -s)"` unconditionally, leaking an agent per tmux pane).
+#
+# Gotcha: `ssh-add -l` exits 1 when the agent is reachable but empty, and 2 when
+# it is unreachable. Only 2 means we actually need a new agent.
+# _ssh_agent_unreachable() { ssh-add -l >/dev/null 2>&1; [ $? -eq 2 ]; }
+# if _ssh_agent_unreachable; then
+#   _agent_env="$HOME/.ssh/agent.env"
+#   [ -f "$_agent_env" ] && . "$_agent_env" >/dev/null
+#   if _ssh_agent_unreachable; then
+#     mkdir -p "$HOME/.ssh"
+#     (umask 077; ssh-agent -s > "$_agent_env")
+#     . "$_agent_env" >/dev/null
+#   fi
+#   unset _agent_env
+# fi
+
+# --- corporate network ------------------------------------------------------
+# export NODE_EXTRA_CA_CERTS="/path/to/ZscalerRootCertificate-2048-SHA256.crt"
+
+# --- Claude Code ------------------------------------------------------------
+# Bypasses every permission prompt. Deliberately per-host: do not enable this
+# on a shared or production machine.
+# alias claude='claude --dangerously-skip-permissions'
+
+# --- Questa / ModelSim ------------------------------------------------------
+# export MGLS_LICENSE_FILE=1800@ir601
+# export SALT_LICENSE_SERVER=1800@ir601
+# export MTI_HOME="$HOME/altera/25.1std/questa_fe"
+# export QUESTA_HOME="$MTI_HOME"
+# export PATH="$QUESTA_HOME/bin:$QUESTA_HOME/linux_x86_64:$PATH"
+# alias vsim='vsim -onfinish stop -voptargs=+acc -assertdebug'
+
+# --- Xilinx / Vivado --------------------------------------------------------
+# source "$HOME/2026.1/Vivado/settings64.sh"
+# export FLEXLM_DIAGNOSTICS=3
+# export XIL_CSE_LEGACY_LICENSE_LOOKUP=1
+# export PILOT_BYPASS_INITIALIZATION_CHECK=1
+# export XILINXD_LICENSE_FILE="$HOME/.Xilinx/Xilinx.lic"
+# export XIL_LIC_BYPASS_VERSION_CHECK=1
+# export XVV_ENABLE_NOLIC_MODE=1
+
+# --- WSL-only shortcuts -----------------------------------------------------
+# alias cdh='cd /mnt/c/Users/Albert\ Luo/Desktop'
+# alias cds='cd /mnt/c/Users/Albert\ Luo/Desktop/serenon_cpld'
