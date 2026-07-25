@@ -48,6 +48,7 @@ dotfiles/
     40-tmux.sh
     50-nvim.sh
     60-claude.sh
+    70-skills.sh
   home/
     .zshrc                         # portable only
     .zshenv
@@ -61,8 +62,10 @@ dotfiles/
     .omc-config.json.template      # nodeBinary resolved at install time
     settings.local.json.example
     hud/                           # 5 vendored files, no cache/
-    skills/                        # authored skills only (see manifest)
-    SKILLS-MANIFEST.md
+  agents/
+    .skill-lock.json               # provenance for all 61 skills
+    skills/                        # all 61 skill dirs, vendored (820K)
+    CLAUDE-SKILL-LINKS.txt         # the 59 names to symlink into ~/.claude/skills
 ```
 
 ### Three-layer configuration model
@@ -124,20 +127,36 @@ Vendored in the repo:
 - `.omc-config.json.template`
 - `hud/` — the 5 real files (`omc-hud-cache.sh`, `find-node.sh`, `omc-hud.mjs`,
   `lib/config-dir.sh`, `lib/config-dir.mjs`), excluding `cache/`
-- Authored skills only
+- All 61 skills, vendored wholesale (see "Skills" below)
 
-Re-fetched on first launch or by upstream tooling:
+Re-fetched on first launch:
 
 - The 4 plugins (`oh-my-claudecode`, `superpowers` ×2, `rust-analyzer-lsp`). Claude Code installs
   these itself from the `extraKnownMarketplaces` entries already in `settings.json`.
-- Marketplace skills — the 34 `firecrawl-*` skills and the Matt Pocock set installed via
-  `setup-matt-pocock-skills`.
 
-The skill directories carry no provenance metadata, so the authored/marketplace split cannot be
-derived programmatically. Implementation performs a one-time manual audit of all 58 skills and
-records the result in `claude/SKILLS-MANIFEST.md`: each skill's name, classification, and — for
-marketplace skills — the upstream that restores it. The manifest is the authoritative list; the
-installer links exactly the skills present under `claude/skills/`.
+#### Skills — revised 2026-07-24 after inspecting the source machine
+
+The original design assumed skill content lived in `~/.claude/skills/` and split it into authored
+(vendor) versus marketplace (re-fetch), pending a manual audit. Inspection disproved both premises:
+
+- Every entry in `~/.claude/skills/` is a **symlink** into `~/.agents/skills/`, a shared
+  skills directory used by many agent CLIs. That directory is the real content.
+- `~/.agents/.skill-lock.json` (schema `version: 3`) records full provenance for all 61 skills, so
+  no manual audit is needed. Grouped by upstream: `mattpocock/skills` 29, `firecrawl/firecrawl-workflows`
+  16, `firecrawl/cli` 10, `firecrawl/skills` 4, `anthropics/skills` 1 (`pdf`),
+  `vercel-labs/skills` 1 (`find-skills`).
+- **No skill is locally authored.** The "authored skills only" set is empty, so that rule would
+  have packaged nothing.
+- 59 of the 61 are linked into `~/.claude/skills`; `pdf` and `find-skills` are deliberately not.
+
+Revised approach: **vendor all of `~/.agents/skills/` plus the lock file** — 820K of markdown, which
+makes the vendor-versus-refetch tradeoff moot — and have the installer recreate the symlink farm.
+No skill-manager CLI is present on the source machine's PATH, so restoring by re-running the
+upstream tool is not reproducible; vendoring is deterministic and works offline.
+
+`agents/CLAUDE-SKILL-LINKS.txt` holds the exact 59 names to link, generated from the current machine
+so `pdf` and `find-skills` stay unlinked. The installer links `~/.claude/skills/<name>` →
+`~/.agents/skills/<name>` for each listed name, and is a no-op when the link already points there.
 
 `hud/` is vendored as a deliberate exception to "re-fetch marketplace content." OMC's setup flow
 creates it, but that flow runs *inside* Claude Code after first launch, which would leave
@@ -178,7 +197,8 @@ Homebrew's prerequisites (`gcc`, `curl`, `file`) are installed.
 | `30-zsh` | oh-my-zsh unattended (`RUNZSH=no CHSH=no KEEP_ZSHRC=yes`); link `.zshrc`, `.zshenv`; seed `~/.zshrc.local` from example if absent; attempt `chsh` | hard fail except `chsh` |
 | `40-tmux` | clone `gpakosz/.tmux` @ `af33f07` to `~/.local/share/tmux/oh-my-tmux`; symlink `~/.config/tmux/tmux.conf` → it; link `tmux.conf.local`; clone tpm; run `tpm/bin/install_plugins` | warn on plugin install |
 | `50-nvim` | link `~/.config/nvim`; `nvim --headless "+Lazy! restore" +qa` | warn |
-| `60-claude` | install Claude Code (`npm install -g @anthropic-ai/claude-code`, using the Homebrew node from `10-packages`); link `settings.json`, `CLAUDE.md`, skills, `hud/`; render `.omc-config.json` from template; seed `settings.local.json` from example | hard fail |
+| `60-claude` | install Claude Code (`npm install -g @anthropic-ai/claude-code`, using the Homebrew node from `10-packages`); link `settings.json`, `CLAUDE.md`, `hud/`; render `.omc-config.json` from template; seed `settings.local.json` from example | hard fail |
+| `70-skills` | copy `agents/skills/` → `~/.agents/skills/` and the lock file → `~/.agents/.skill-lock.json`; recreate the 59 symlinks in `~/.claude/skills` from `CLAUDE-SKILL-LINKS.txt` | warn |
 
 `Lazy! restore` rather than `Lazy! sync` — restore honors `lazy-lock.json`, so plugin versions
 match the source machine exactly.
@@ -216,6 +236,9 @@ instructs the user to run `claude` and log in.
   `.omc-config.json` exists and is executable; `hud/omc-hud-cache.sh` is executable
 - no linked path under `~/.claude` resolves into machine state (`credentials`, `history`,
   `projects`, `session-env`)
+- `~/.claude/skills` contains exactly the 59 names in `CLAUDE-SKILL-LINKS.txt`, each a symlink
+  resolving to an existing directory under `~/.agents/skills`; `pdf` and `find-skills` are present
+  in `~/.agents/skills` but absent from `~/.claude/skills`
 
 ## Testing Strategy
 
