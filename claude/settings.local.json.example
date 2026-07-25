@@ -1,0 +1,6 @@
+{
+  "_comment": "Per-host Claude Code settings. Copied to ~/.claude/settings.local.json on install and never tracked. Uncomment skipDangerousModePermissionPrompt only on a machine you fully control.",
+  "permissions": {
+    "allow": []
+  }
+}

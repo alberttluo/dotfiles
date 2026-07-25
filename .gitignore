@@ -1,0 +1,22 @@
+# OMC operational state
+.omc/
+
+# Per-host config — seeded from the .example files, never committed
+home/.zshrc.local
+claude/settings.local.json
+
+# Claude Code machine state must never enter this repo
+claude/.credentials.json
+claude/history.jsonl
+claude/projects/
+claude/session-env/
+claude/sessions/
+claude/file-history/
+claude/paste-cache/
+claude/shell-snapshots/
+claude/hud/cache/
+claude/.claude.json
+
+# Scratch
+*.tmp
+.DS_Store

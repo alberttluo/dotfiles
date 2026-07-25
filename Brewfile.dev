@@ -1,0 +1,5 @@
+# Development dependencies for working on this repo.
+# NOT installed by install.sh — see Brewfile for runtime deps.
+brew "bats-core"
+brew "shellcheck"
+brew "shfmt"
