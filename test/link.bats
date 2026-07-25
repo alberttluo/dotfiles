@@ -74,6 +74,16 @@ link_sh() {
   [ ! -e "$HOME/.file" ]
 }
 
+@test "backup_and_link under DRY_RUN does not claim to have moved anything" {
+  printf 'original\n' > "$HOME/.file"
+  run link_sh "DRY_RUN=1 backup_and_link '$SRC/file' '$HOME/.file' 2>&1"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"would move"* ]]
+  # the original must still be in place, and nothing in the backup dir
+  [ "$(cat "$HOME/.file")" = "original" ]
+  [ -z "$(ls -A "$BACKUP_DIR")" ]
+}
+
 @test "backup_and_copy copies rather than links" {
   run link_sh "backup_and_copy '$SRC/file' '$HOME/.copied'"
   [ "$status" -eq 0 ]

@@ -7,7 +7,13 @@ _displace() {
   [ -e "$dest" ] || [ -L "$dest" ] || return 0
   run mkdir -p "$BACKUP_DIR"
   run mv "$dest" "$BACKUP_DIR/$(basename "$dest")"
-  log_warn "moved existing $dest to $BACKUP_DIR/"
+  # Phrased conditionally: under DRY_RUN nothing actually moved, and claiming
+  # otherwise makes the dry-run report untrustworthy.
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log_warn "would move existing $dest to $BACKUP_DIR/"
+  else
+    log_warn "moved existing $dest to $BACKUP_DIR/"
+  fi
 }
 
 backup_and_link() {

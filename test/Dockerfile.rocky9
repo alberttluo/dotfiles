@@ -1,0 +1,14 @@
+# RHEL-family integration test target. Approximates a fresh corporate host:
+# a non-root user with sudo, and none of the dotfiles dependencies preinstalled.
+FROM rockylinux:9
+
+RUN dnf -y install sudo git curl file procps-ng which findutils \
+                   gcc make unzip fontconfig \
+ && dnf clean all
+
+RUN useradd -m -s /bin/bash tester \
+ && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester
+
+USER tester
+WORKDIR /home/tester
+ENV HOME=/home/tester
