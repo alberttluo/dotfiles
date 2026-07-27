@@ -11,9 +11,12 @@ source "$DOTFILES_ROOT/lib/log.sh"
 source "$DOTFILES_ROOT/lib/os.sh"
 # shellcheck source=lib/link.sh
 source "$DOTFILES_ROOT/lib/link.sh"
+# shellcheck source=lib/portable.sh
+source "$DOTFILES_ROOT/lib/portable.sh"
 
 DRY_RUN=0
 SKIP_FONTS=0
+PORTABLE_ONLY=0
 ONLY=""
 
 # id:function, in execution order.
@@ -36,6 +39,8 @@ Usage: ./install.sh [options]
   --dry-run       Print what would happen without touching the filesystem
   --only <id>     Run a single step (e.g. --only 40-tmux)
   --skip-fonts    Skip font installation
+  --portable      Never use Homebrew; fetch prebuilt binaries into ~/.local
+                  instead. Use this when you have no sudo.
   --help          Show this message
 
 Steps run in order: 00-preflight 10-packages 20-fonts 30-zsh 40-tmux 50-nvim
@@ -47,13 +52,14 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)    DRY_RUN=1 ;;
     --skip-fonts) SKIP_FONTS=1 ;;
+    --portable)   PORTABLE_ONLY=1 ;;
     --only)       ONLY="${2:-}"; shift ;;
     --help|-h)    usage; exit 0 ;;
     *)            printf 'unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
-export DRY_RUN
+export DRY_RUN PORTABLE_ONLY
 
 if [ -n "$ONLY" ]; then
   _known=0

@@ -19,6 +19,24 @@ Preview without changing anything: `./install.sh --dry-run`.
 Re-run one step: `./install.sh --only 40-tmux`.
 Check an existing install: `./verify.sh`.
 
+### No sudo
+
+Homebrew cannot be installed without root, so on a locked-down host use:
+
+```
+./install.sh --portable
+```
+
+This skips Homebrew entirely and downloads pinned prebuilt binaries into
+`~/.local` instead — zsh, tmux, Neovim, node, jq and rust. A plain `./install.sh`
+does the same automatically for anything Homebrew could not provide, so the flag
+only matters when you want to bypass a working Homebrew.
+
+Two things are never fetched this way: `git`, which you already need to clone
+this repo, and tmux on macOS, which publishes no static build. Everything that
+needs no privileges at all — zsh, tmux, Neovim and Claude Code config — installs
+regardless.
+
 ## What is shared and what is per-host
 
 `~/.zshrc` is portable and tracked here. Everything machine-specific — EDA tool
@@ -45,7 +63,7 @@ effect. That is the deliberate cost of keeping runtime writes out of git.
 
 | Component | Detail |
 |---|---|
-| Dependencies | Homebrew on both platforms: zsh, tmux, git, neovim, node, jq, rust |
+| Dependencies | Homebrew on both platforms: zsh, tmux, git, neovim, node, jq, rust; pinned prebuilt downloads into `~/.local` when Homebrew is unavailable |
 | Fonts | JetBrainsMono Nerd Font v3.4.0, all variants |
 | zsh | oh-my-zsh, `robbyrussell`, `plugins=(git)` |
 | tmux | oh-my-tmux pinned to `af33f07`, tpm, tmux-agent-indicator, extrakto |
@@ -106,7 +124,7 @@ excludes every project beneath it.
 |---|---|
 | `install.sh` | Entrypoint: flags, step ordering, dispatch, summary |
 | `verify.sh` | Post-install assertions, runnable standalone |
-| `lib/` | `log.sh` (output + dry-run), `os.sh` (OS/brew), `link.sh` (backup+symlink) |
+| `lib/` | `log.sh` (output + dry-run), `os.sh` (OS/brew), `link.sh` (backup+symlink), `portable.sh` (sudo-less downloads) |
 | `install/` | One file per step, `00-preflight` through `80-context-manager` |
 | `home/` | zsh config plus the per-host example |
 | `config/` | tmux, Neovim, and context-manager config |

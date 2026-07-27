@@ -33,6 +33,22 @@ EOF
   chmod +x "$STUB_BIN/$name"
 }
 
+# sandbox_path — prints a PATH holding only $STUB_BIN plus the shell utilities the
+# install scripts themselves call. /usr/bin carries real git, jq, zsh and tmux, so a
+# test that expects one of those to be missing silently passes on the developer's
+# machine unless the search path excludes it.
+sandbox_path() {
+  local util src
+  SYS_BIN="$TEST_TMP/sysbin"
+  export SYS_BIN
+  mkdir -p "$SYS_BIN"
+  for util in bash sh env printf mktemp mkdir rmdir rm mv cp ln chmod tar gzip xz cat sed grep uname dirname basename; do
+    src="$(command -v "$util" 2>/dev/null)" || continue
+    [ -n "$src" ] && ln -sf "$src" "$SYS_BIN/$util"
+  done
+  printf '%s' "$STUB_BIN:$SYS_BIN"
+}
+
 # stub_called <substring> — true if any stub invocation line contains it
 stub_called() {
   grep -qF -- "$1" "$STUB_LOG"

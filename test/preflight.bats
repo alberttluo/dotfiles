@@ -17,10 +17,9 @@ preflight() {
   "
 }
 
-@test "step_preflight fails when curl is unavailable" {
-  # A PATH containing only the stub dir hides curl and git.
+@test "step_preflight fails when no downloader is available" {
   run bash -c "
-    PATH='$STUB_BIN'
+    PATH='$(sandbox_path)'
     source '$DOTFILES_ROOT/lib/log.sh'
     source '$DOTFILES_ROOT/lib/os.sh'
     source '$DOTFILES_ROOT/install/00-preflight.sh'
@@ -28,6 +27,55 @@ preflight() {
   "
   [ "$status" -eq 1 ]
   [[ "$output" == *"curl"* ]]
+}
+
+@test "wget alone satisfies the downloader requirement" {
+  stub_command uname 0 "Linux"
+  stub_command wget 0
+  stub_command git 0
+  run bash -c "
+    PATH='$(sandbox_path)'
+    export BACKUP_DIR='$BACKUP_DIR' BREW_CANDIDATE_ROOT='$TEST_TMP/noroot'
+    source '$DOTFILES_ROOT/lib/log.sh'
+    source '$DOTFILES_ROOT/lib/os.sh'
+    source '$DOTFILES_ROOT/install/00-preflight.sh'
+    step_preflight 2>&1
+  "
+  [ "$status" -ne 1 ]
+  [[ "$output" != *"required command not found"* ]]
+}
+
+@test "a machine with no usable Homebrew warns instead of aborting the install" {
+  stub_command uname 0 "Linux"
+  stub_command curl 0
+  stub_command git 0
+  run bash -c "
+    PATH='$(sandbox_path)'
+    export BACKUP_DIR='$BACKUP_DIR' BREW_CANDIDATE_ROOT='$TEST_TMP/noroot'
+    source '$DOTFILES_ROOT/lib/log.sh'
+    source '$DOTFILES_ROOT/lib/os.sh'
+    source '$DOTFILES_ROOT/install/00-preflight.sh'
+    step_preflight 2>&1
+  "
+  # 2 = warn-and-continue. Returning 1 here aborts every later step, including
+  # zsh, tmux, Neovim and Claude config, none of which need privileges.
+  [ "$status" -eq 2 ]
+}
+
+@test "--portable does not even attempt the Homebrew bootstrap" {
+  stub_command uname 0 "Linux"
+  stub_command curl 0
+  stub_command git 0
+  run bash -c "
+    PATH='$(sandbox_path)'
+    export BACKUP_DIR='$BACKUP_DIR' BREW_CANDIDATE_ROOT='$TEST_TMP/noroot' PORTABLE_ONLY=1
+    source '$DOTFILES_ROOT/lib/log.sh'
+    source '$DOTFILES_ROOT/lib/os.sh'
+    source '$DOTFILES_ROOT/install/00-preflight.sh'
+    step_preflight >/dev/null 2>&1
+  "
+  [ "$status" -eq 0 ]
+  ! stub_called "Homebrew/install"
 }
 
 @test "step_preflight fails on an unsupported OS" {

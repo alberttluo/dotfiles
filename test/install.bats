@@ -25,6 +25,25 @@ EOF
   [[ "$output" == *"--dry-run"* ]]
   [[ "$output" == *"--only"* ]]
   [[ "$output" == *"--skip-fonts"* ]]
+  [[ "$output" == *"--portable"* ]]
+}
+
+@test "--portable exports PORTABLE_ONLY=1 to steps" {
+  cat > "$REPO/install/00-preflight.sh" <<EOF
+#!/usr/bin/env bash
+step_preflight() { echo "portable=\${PORTABLE_ONLY:-unset}" >> "$STUB_LOG"; return 0; }
+EOF
+  run bash "$REPO/install.sh" --portable
+  stub_called "portable=1"
+}
+
+@test "the portable provisioning library is available to steps" {
+  cat > "$REPO/install/00-preflight.sh" <<EOF
+#!/usr/bin/env bash
+step_preflight() { command -v portable_install >/dev/null && echo "have_portable" >> "$STUB_LOG"; return 0; }
+EOF
+  run bash "$REPO/install.sh"
+  stub_called "have_portable"
 }
 
 @test "rejects an unknown flag" {
