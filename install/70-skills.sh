@@ -7,10 +7,15 @@
 # so the 820K tree is vendored and copied rather than re-fetched.
 
 step_skills() {
-  local rc=0 agents_dir="$HOME/.agents" name target linkdir count
+  # The skills tree is 61 copied directories plus the links into Claude Code, so
+  # it follows the data root rather than always landing on $HOME's volume.
+  local agents_dir="${DOTFILES_DATA_ROOT:+$DOTFILES_DATA_ROOT/agents}"
+  local rc=0 name target linkdir count
+  agents_dir="${agents_dir:-$HOME/.agents}"
+  local claude_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
   if [ "${DRY_RUN:-0}" = "1" ]; then
-    log_dry "copy 61 skills into $agents_dir and link 59 into $HOME/.claude/skills"
+    log_dry "copy 61 skills into $agents_dir and link 59 into $claude_dir/skills"
     return 0
   fi
 
@@ -24,7 +29,7 @@ step_skills() {
   count="$(find "$agents_dir/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
   log_ok "installed $count skills into $agents_dir/skills"
 
-  linkdir="$HOME/.claude/skills"
+  linkdir="$claude_dir/skills"
   mkdir -p "$linkdir"
   while read -r name; do
     [ -n "$name" ] || continue

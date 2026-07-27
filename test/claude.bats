@@ -144,3 +144,13 @@ claude_step_without_cli() {
   run claude_step_without_cli "step_claude"
   [ "$status" -eq 2 ]
 }
+
+@test "Claude config follows CLAUDE_CONFIG_DIR onto another volume" {
+  export CLAUDE_CONFIG_DIR="$TEST_TMP/ece/claude"
+  stub_command claude 0
+  stub_command node 0
+  run claude_step "CLAUDE_CONFIG_DIR='$CLAUDE_CONFIG_DIR' step_claude 2>&1"
+  [ -f "$CLAUDE_CONFIG_DIR/settings.json" ]
+  [ -L "$CLAUDE_CONFIG_DIR/CLAUDE.md" ]
+  [ ! -d "$HOME/.claude" ]
+}

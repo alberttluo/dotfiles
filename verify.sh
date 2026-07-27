@@ -20,6 +20,15 @@ FAILURES=0
 # Same resolution oh-my-tmux uses; hardcoding ~/.config would pass on precisely
 # the machine where the packaged config is being ignored.
 TMUX_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+# Same reasoning for the data locations: on a --data-root install these live on
+# another volume, and checking $HOME would report a broken install as missing.
+# ~/.dotfiles-env is what a login shell reads, so read it here too.
+# shellcheck source=/dev/null
+[ -f "$HOME/.dotfiles-env" ] && . "$HOME/.dotfiles-env"
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+BIN_DIR="${PORTABLE_PREFIX:-$HOME/.local}/bin"
+AGENTS_DIR="${DOTFILES_DATA_ROOT:+$DOTFILES_DATA_ROOT/agents}"
+AGENTS_DIR="${AGENTS_DIR:-$HOME/.agents}"
 CM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/context-manager/config.toml"
 
 # Cheap TOML sanity check: the daemon reads this file at startup and a syntax
@@ -38,7 +47,7 @@ _cm_hook_wired() {
   jq -e '
     ([.hooks.SessionStart[]?.hooks[]?.command] | any(test("cm-hook"))) and
     ([.hooks.SessionEnd[]?.hooks[]?.command]   | any(test("cm-hook")))
-  ' "$HOME/.claude/settings.json" >/dev/null 2>&1
+  ' "$CLAUDE_DIR/settings.json" >/dev/null 2>&1
 }
 
 # check DESCRIPTION COMMAND... — never aborts, so one failure cannot mask others.
@@ -60,9 +69,9 @@ _skills_linked() {
   local name target
   while read -r name; do
     [ -n "$name" ] || continue
-    target="$(readlink "$HOME/.claude/skills/$name" 2>/dev/null)"
-    [ "$target" = "$HOME/.agents/skills/$name" ] || return 1
-    [ -d "$HOME/.claude/skills/$name" ] || return 1
+    target="$(readlink "$CLAUDE_DIR/skills/$name" 2>/dev/null)"
+    [ "$target" = "$AGENTS_DIR/skills/$name" ] || return 1
+    [ -d "$CLAUDE_DIR/skills/$name" ] || return 1
   done < "$VERIFY_ROOT/agents/CLAUDE-SKILL-LINKS.txt"
   return 0
 }
@@ -132,7 +141,7 @@ _tmux_themed() {
 _no_state_linked() {
   local p
   for p in .credentials.json history.jsonl projects session-env; do
-    if [ -L "$HOME/.claude/$p" ]; then
+    if [ -L "$CLAUDE_DIR/$p" ]; then
       return 1
     fi
   done
@@ -141,12 +150,12 @@ _no_state_linked() {
 
 # Claude Code writes to settings.json, so it must not be a symlink into the repo.
 _settings_is_copy() {
-  [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" ]
+  [ -f "$CLAUDE_DIR/settings.json" ] && [ ! -L "$CLAUDE_DIR/settings.json" ]
 }
 
 _omc_node_ok() {
   local n
-  n="$(jq -r '.nodeBinary' "$HOME/.claude/.omc-config.json" 2>/dev/null)"
+  n="$(jq -r '.nodeBinary' "$CLAUDE_DIR/.omc-config.json" 2>/dev/null)"
   [ -n "$n" ] && [ "$n" != "null" ] && [ -x "$n" ]
 }
 
@@ -186,12 +195,12 @@ check "nvim starts headless cleanly"                nvim --headless +qa
 printf '\n──────── claude code ────────\n'
 check "claude CLI is installed"                     command -v claude
 check "settings.json is a copy, not a repo symlink"  _settings_is_copy
-check "settings.json is valid JSON"                 jq -e . "$HOME/.claude/settings.json"
-check "CLAUDE.md is linked"                         test -L "$HOME/.claude/CLAUDE.md"
-check "hud script is executable"                    test -x "$HOME/.claude/hud/omc-hud-cache.sh"
+check "settings.json is valid JSON"                 jq -e . "$CLAUDE_DIR/settings.json"
+check "CLAUDE.md is linked"                         test -L "$CLAUDE_DIR/CLAUDE.md"
+check "hud script is executable"                    test -x "$CLAUDE_DIR/hud/omc-hud-cache.sh"
 check ".omc-config.json node path is valid"         _omc_node_ok
 check "all 59 manifest skills are linked"           _skills_linked
-check "pdf is not linked into Claude Code"          test '!' -e "$HOME/.claude/skills/pdf"
+check "pdf is not linked into Claude Code"          test '!' -e "$CLAUDE_DIR/skills/pdf"
 check "no machine state is linked"                  _no_state_linked
 
 printf '\n──────── context-manager ────────\n'
@@ -201,9 +210,9 @@ check "cwd exclusions are configured"               grep -q '^ignore_cwds = \[' 
 check "cm-hook is wired into settings.json"         _cm_hook_wired
 # Reported, not required: the daemon is built from a separate repo, so a machine
 # can be fully provisioned by this installer and still not run it.
-if [ -x "$HOME/.local/bin/context-managerd" ]; then
-  check "context-managerd is installed"             test -x "$HOME/.local/bin/context-managerd"
-  check "cm-hook is installed"                      test -x "$HOME/.local/bin/cm-hook"
+if [ -x "$BIN_DIR/context-managerd" ]; then
+  check "context-managerd is installed"             test -x "$BIN_DIR/context-managerd"
+  check "cm-hook is installed"                      test -x "$BIN_DIR/cm-hook"
   check "the service is active"                     systemctl --user is-active --quiet context-manager
 else
   printf '  · context-manager daemon not installed (optional) — skipped\n'

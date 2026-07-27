@@ -78,6 +78,45 @@ preflight() {
   ! stub_called "Homebrew/install"
 }
 
+@test "a data root is created and recorded for later shells" {
+  stub_command uname 0 "Linux"
+  stub_command curl 0
+  stub_command git 0
+  local root="$TEST_TMP/ece/albertlu/dotfiles-data"
+  run bash -c "
+    PATH='$(sandbox_path)'
+    export BACKUP_DIR='$BACKUP_DIR' BREW_CANDIDATE_ROOT='$TEST_TMP/noroot'
+    export DOTFILES_DATA_ROOT='$root' HOME='$HOME'
+    source '$DOTFILES_ROOT/lib/log.sh'
+    source '$DOTFILES_ROOT/lib/os.sh'
+    source '$DOTFILES_ROOT/lib/data-root.sh'
+    source '$DOTFILES_ROOT/install/00-preflight.sh'
+    step_preflight 2>&1
+  "
+  [ "$status" -ne 1 ]
+  [ -d "$root" ]
+  # Without this file the next login shell looks in $HOME again and finds nothing.
+  [ -f "$HOME/.dotfiles-env" ]
+  grep -q "$root" "$HOME/.dotfiles-env"
+}
+
+@test "an unusable data root aborts before anything is installed into it" {
+  stub_command uname 0 "Linux"
+  stub_command curl 0
+  stub_command git 0
+  run bash -c "
+    PATH='$(sandbox_path)'
+    export BACKUP_DIR='$BACKUP_DIR' BREW_CANDIDATE_ROOT='$TEST_TMP/noroot'
+    export DOTFILES_DATA_ROOT='/proc/nope/data' HOME='$HOME'
+    source '$DOTFILES_ROOT/lib/log.sh'
+    source '$DOTFILES_ROOT/lib/os.sh'
+    source '$DOTFILES_ROOT/lib/data-root.sh'
+    source '$DOTFILES_ROOT/install/00-preflight.sh'
+    step_preflight 2>&1
+  "
+  [ "$status" -eq 1 ]
+}
+
 @test "step_preflight fails on an unsupported OS" {
   stub_command uname 0 "FreeBSD"
   run preflight "step_preflight"

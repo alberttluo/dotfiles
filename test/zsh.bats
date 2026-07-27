@@ -39,7 +39,7 @@ zsh_step() {
 }
 
 @test ".zshenv guards the cargo env" {
-  grep -qE '\[ -f "\$HOME/\.cargo/env" \]' "$DOTFILES_ROOT/home/.zshenv"
+  grep -qE '\[ -f "\$\{CARGO_HOME:-\$HOME/\.cargo\}/env" \]' "$DOTFILES_ROOT/home/.zshenv"
 }
 
 @test "the example per-host file carries the EDA config" {
@@ -107,4 +107,32 @@ zsh_step() {
   run zsh_step "SHELL='$zsh_path' OS=linux step_zsh"
   [ "$status" -eq 0 ]
   ! stub_called "chsh"
+}
+
+@test 'oh-my-zsh is installed where \$ZSH points, not always under HOME' {
+  export ZSH="$TEST_TMP/ece/oh-my-zsh"
+  mkdir -p "$ZSH"
+  stub_command chsh 0
+  stub_command zsh 0
+  run zsh_step "ZSH='$ZSH' step_zsh 2>&1"
+  # An existing tree at $ZSH counts as installed; the installer must not be run
+  # and nothing may be created under HOME instead.
+  [[ "$output" == *"already present"* ]]
+  [ ! -d "$HOME/.oh-my-zsh" ]
+}
+
+@test ".zshrc defers to an already-exported ZSH" {
+  grep -qE '\$\{ZSH:=|\$\{ZSH:-' "$DOTFILES_ROOT/home/.zshrc"
+}
+
+@test ".zshrc puts the portable prefix on PATH rather than a fixed ~/.local" {
+  grep -q 'PORTABLE_PREFIX' "$DOTFILES_ROOT/home/.zshrc"
+}
+
+@test ".zshenv sources the generated data-root file before anything needs it" {
+  grep -q 'dotfiles-env' "$DOTFILES_ROOT/home/.zshenv"
+}
+
+@test ".zshenv finds cargo through CARGO_HOME" {
+  grep -q 'CARGO_HOME' "$DOTFILES_ROOT/home/.zshenv"
 }

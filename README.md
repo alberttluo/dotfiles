@@ -37,6 +37,50 @@ this repo, and tmux on macOS, which publishes no static build. Everything that
 needs no privileges at all — zsh, tmux, Neovim and Claude Code config — installs
 regardless.
 
+### When $HOME is too small
+
+Some hosts give you a small, separately-quota'd home volume and a larger one
+elsewhere — CMU's AFS andrew space next to ece space is the case this was built
+for. A normal install puts several GB in `$HOME`; almost none of it is
+configuration.
+
+```
+./install.sh --portable --data-root /afs/ece.cmu.edu/usr/<andrewid>/dotfiles-data
+```
+
+Config stays in `$HOME`, because zsh reads `~/.zshenv` before anything else can
+run. Everything else moves:
+
+| Under the data root | What it holds |
+|---|---|
+| `bin/`, `nvim/`, `node/` | prebuilt binaries |
+| `cargo/`, `rustup/` | Rust toolchain |
+| `share/`, `state/`, `cache/` | `XDG_*`: fonts, nvim plugins, tmux trees |
+| `oh-my-zsh/`, `nvm/` | shell and node frameworks |
+| `claude/` | Claude Code config **and** its transcripts, which grow without bound |
+| `agents/` | the 61-skill tree |
+| `src/context-manager/` | the daemon checkout and its Rust build output |
+
+What stays in `$HOME`: `.zshrc`, `.zshenv`, `.zshrc.local`, `.config/nvim` (a
+symlink into this repo), `.config/context-manager/config.toml`, and
+`.dotfiles-env`.
+
+Relocation is done with the environment variables each tool already supports
+(`XDG_DATA_HOME`, `CARGO_HOME`, `ZSH`, `CLAUDE_CONFIG_DIR`, …), not symlinks: a
+link into a volume that is not mounted, or for which you hold no AFS token,
+fails far less legibly than an unset variable.
+
+The installer writes those variables to `~/.dotfiles-env`, which `~/.zshenv`
+sources, so your shells resolve the same locations afterwards — and re-running
+`./install.sh` from such a shell keeps the same root without repeating the flag.
+`verify.sh` reads that file too.
+
+On AFS specifically: `chsh` is usually unavailable, so take the `~/.bashrc`
+fallback the installer prints. If the data root cannot be created, check `fs
+listacl` on its parent and that you still hold a token (`klist`) — neither looks
+like a permission error to `mkdir`. Fonts installed on a remote VM do nothing
+for a terminal running on your laptop; install those locally.
+
 ## What is shared and what is per-host
 
 `~/.zshrc` is portable and tracked here. Everything machine-specific — EDA tool
@@ -124,7 +168,7 @@ excludes every project beneath it.
 |---|---|
 | `install.sh` | Entrypoint: flags, step ordering, dispatch, summary |
 | `verify.sh` | Post-install assertions, runnable standalone |
-| `lib/` | `log.sh` (output + dry-run), `os.sh` (OS/brew), `link.sh` (backup+symlink), `portable.sh` (sudo-less downloads) |
+| `lib/` | `log.sh` (output + dry-run), `os.sh` (OS/brew), `link.sh` (backup+symlink), `portable.sh` (sudo-less downloads), `data-root.sh` (relocation off `$HOME`) |
 | `install/` | One file per step, `00-preflight` through `80-context-manager` |
 | `home/` | zsh config plus the per-host example |
 | `config/` | tmux, Neovim, and context-manager config |

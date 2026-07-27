@@ -13,10 +13,13 @@ source "$DOTFILES_ROOT/lib/os.sh"
 source "$DOTFILES_ROOT/lib/link.sh"
 # shellcheck source=lib/portable.sh
 source "$DOTFILES_ROOT/lib/portable.sh"
+# shellcheck source=lib/data-root.sh
+source "$DOTFILES_ROOT/lib/data-root.sh"
 
 DRY_RUN=0
 SKIP_FONTS=0
 PORTABLE_ONLY=0
+DATA_ROOT="${DOTFILES_DATA_ROOT:-}"
 ONLY=""
 
 # id:function, in execution order.
@@ -41,6 +44,10 @@ Usage: ./install.sh [options]
   --skip-fonts    Skip font installation
   --portable      Never use Homebrew; fetch prebuilt binaries into ~/.local
                   instead. Use this when you have no sudo.
+  --data-root DIR Keep binaries, fonts, toolchains, plugin trees and build
+                  output under DIR instead of $HOME. Use this when $HOME is a
+                  small quota'd volume (e.g. CMU AFS andrew space) and a larger
+                  one is available. Config stays in $HOME either way.
   --help          Show this message
 
 Steps run in order: 00-preflight 10-packages 20-fonts 30-zsh 40-tmux 50-nvim
@@ -53,6 +60,11 @@ while [ $# -gt 0 ]; do
     --dry-run)    DRY_RUN=1 ;;
     --skip-fonts) SKIP_FONTS=1 ;;
     --portable)   PORTABLE_ONLY=1 ;;
+    --data-root)
+      DATA_ROOT="${2:-}"
+      [ -n "$DATA_ROOT" ] || { printf '%s\n' '--data-root needs a directory' >&2; exit 2; }
+      shift
+      ;;
     --only)       ONLY="${2:-}"; shift ;;
     --help|-h)    usage; exit 0 ;;
     *)            printf 'unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -60,6 +72,13 @@ while [ $# -gt 0 ]; do
   shift
 done
 export DRY_RUN PORTABLE_ONLY
+
+# Applied before any step runs, so every step and every child process it spawns
+# already sees the relocated locations. 00-preflight then creates the root and
+# records it for later shells.
+if [ -n "$DATA_ROOT" ]; then
+  apply_data_root "$DATA_ROOT"
+fi
 
 if [ -n "$ONLY" ]; then
   _known=0

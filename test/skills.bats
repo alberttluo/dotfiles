@@ -128,3 +128,13 @@ skills_step() {
   "
   [ "$status" -ne 0 ]
 }
+
+@test "the skills tree follows the data root off HOME's volume" {
+  export DOTFILES_DATA_ROOT="$TEST_TMP/ece"
+  export CLAUDE_CONFIG_DIR="$TEST_TMP/ece/claude"
+  run skills_step "DOTFILES_DATA_ROOT='$DOTFILES_DATA_ROOT' CLAUDE_CONFIG_DIR='$CLAUDE_CONFIG_DIR' step_skills 2>&1"
+  [ -d "$DOTFILES_DATA_ROOT/agents/skills" ]
+  [ -d "$CLAUDE_CONFIG_DIR/skills" ]
+  [ ! -d "$HOME/.agents" ]
+  [ ! -d "$HOME/.claude" ]
+}

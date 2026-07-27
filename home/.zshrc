@@ -20,18 +20,21 @@ done
 unset _brew_candidate
 
 # --- oh-my-zsh --------------------------------------------------------------
-export ZSH="$HOME/.oh-my-zsh"
+# Defaults only: ~/.dotfiles-env may already have pointed these at another volume.
+: "${ZSH:=$HOME/.oh-my-zsh}"
+export ZSH
 ZSH_THEME="robbyrussell"
 plugins=(git)
 [ -f "$ZSH/oh-my-zsh.sh" ] && source "$ZSH/oh-my-zsh.sh"
 
 # --- node -------------------------------------------------------------------
-export NVM_DIR="$HOME/.nvm"
+: "${NVM_DIR:=$HOME/.nvm}"
+export NVM_DIR
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 
 # --- path -------------------------------------------------------------------
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="${PORTABLE_PREFIX:-$HOME/.local}/bin:$PATH"
 
 # --- per-host ---------------------------------------------------------------
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"

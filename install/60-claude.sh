@@ -8,6 +8,10 @@
 
 step_claude() {
   local rc=0 node_bin
+  # Claude Code's own variable, already the convention in claude/hud/lib/config-dir.sh.
+  # Transcripts under projects/ grow without bound, so this is one of the larger
+  # things a --data-root install needs to move off $HOME.
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
   if command -v claude >/dev/null 2>&1; then
     log_ok "Claude Code already installed"
@@ -18,18 +22,18 @@ step_claude() {
     log_ok "installed Claude Code"
   fi
 
-  run mkdir -p "$HOME/.claude"
+  run mkdir -p "$config_dir"
   # COPIED, not linked. Claude Code writes to settings.json at runtime (theme,
   # model, skipDangerousModePermissionPrompt, plugin state), so a symlink lets the
   # application mutate tracked config — which silently re-added a per-host
   # permission bypass to this repo once already.
-  backup_and_copy "$DOTFILES_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || return 1
+  backup_and_copy "$DOTFILES_ROOT/claude/settings.json" "$config_dir/settings.json" || return 1
   # CLAUDE.md is author-edited only, so linking is correct: edits in the repo take
   # effect immediately and nothing writes to it behind your back.
-  backup_and_link "$DOTFILES_ROOT/claude/CLAUDE.md"     "$HOME/.claude/CLAUDE.md"     || return 1
+  backup_and_link "$DOTFILES_ROOT/claude/CLAUDE.md"     "$config_dir/CLAUDE.md"     || return 1
   # COPIED, not linked. The HUD writes per-session cache into hud/cache/, so a
   # symlink would make the repo the write target for runtime state.
-  backup_and_copy "$DOTFILES_ROOT/claude/hud"           "$HOME/.claude/hud"           || return 1
+  backup_and_copy "$DOTFILES_ROOT/claude/hud"           "$config_dir/hud"           || return 1
 
   node_bin="$(command -v node || true)"
   if [ -z "$node_bin" ]; then
@@ -42,18 +46,18 @@ step_claude() {
   else
     sed "s#@@NODE_BINARY@@#$node_bin#" \
       "$DOTFILES_ROOT/claude/.omc-config.json.template" \
-      > "$HOME/.claude/.omc-config.json" \
+      > "$config_dir/.omc-config.json" \
       || { log_fail "could not render .omc-config.json"; return 1; }
     log_ok "rendered .omc-config.json (node: $node_bin)"
   fi
 
   # Per-host, so seeded rather than linked.
-  if [ -f "$HOME/.claude/settings.local.json" ]; then
-    log_ok "$HOME/.claude/settings.local.json already exists — left untouched"
+  if [ -f "$config_dir/settings.local.json" ]; then
+    log_ok "$config_dir/settings.local.json already exists — left untouched"
   else
     run cp "$DOTFILES_ROOT/claude/settings.local.json.example" \
-           "$HOME/.claude/settings.local.json"
-    log_ok "seeded $HOME/.claude/settings.local.json"
+           "$config_dir/settings.local.json"
+    log_ok "seeded $config_dir/settings.local.json"
   fi
 
   log_followup "run 'claude' and log in — credentials are never packaged"

@@ -27,6 +27,13 @@ step_preflight() {
     done
   fi
 
+  # Before anything is downloaded into it. An unusable data root is fatal: the
+  # alternative is silently filling the volume the user asked us to avoid.
+  if [ -n "${DOTFILES_DATA_ROOT:-}" ]; then
+    ensure_data_root "$DOTFILES_DATA_ROOT" || return 1
+    write_data_root_env "$DOTFILES_DATA_ROOT" || return 1
+  fi
+
   run mkdir -p "$BACKUP_DIR"
   log_ok "backups will go to $BACKUP_DIR"
 

@@ -9,7 +9,7 @@ OH_MY_TMUX_REPO="https://github.com/gpakosz/.tmux.git"
 OH_MY_TMUX_COMMIT="af33f07"
 
 step_tmux() {
-  local omt="$HOME/.local/share/tmux/oh-my-tmux"
+  local omt="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/oh-my-tmux"
   # Honour XDG_CONFIG_HOME. oh-my-tmux resolves its config as the first existing
   # of $HOME/.tmux.conf, $XDG_CONFIG_HOME/tmux/tmux.conf, $HOME/.config/tmux/tmux.conf
   # — so hardcoding ~/.config writes to a path tmux never reads when that variable

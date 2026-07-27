@@ -11,7 +11,7 @@ _font_dir() {
   if [ "${OS:-linux}" = "macos" ]; then
     printf '%s\n' "$HOME/Library/Fonts"
   else
-    printf '%s\n' "$HOME/.local/share/fonts"
+    printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
   fi
 }
 

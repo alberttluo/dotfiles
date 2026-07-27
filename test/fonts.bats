@@ -89,3 +89,13 @@ EOF
   [ "$status" -eq 0 ]
   ! stub_called "curl"
 }
+
+@test "fonts follow XDG_DATA_HOME onto another volume" {
+  make_fake_zip
+  stub_curl_serving_zip
+  export XDG_DATA_HOME="$TEST_TMP/ece/share"
+  run fonts "XDG_DATA_HOME='$XDG_DATA_HOME' OS=linux step_fonts"
+  [ "$status" -eq 0 ]
+  [ -d "$XDG_DATA_HOME/fonts" ]
+  [ ! -d "$HOME/.local/share/fonts" ]
+}

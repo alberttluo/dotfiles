@@ -56,9 +56,9 @@ step_context_manager() {
   # rustup installs outside PATH for non-login shells, so probe ~/.cargo too.
   if command -v cargo >/dev/null 2>&1; then
     cargo_bin="$(command -v cargo)"
-  elif [ -x "$HOME/.cargo/bin/cargo" ]; then
-    cargo_bin="$HOME/.cargo/bin/cargo"
-    PATH="$HOME/.cargo/bin:$PATH"
+  elif [ -x "${CARGO_HOME:-$HOME/.cargo}/bin/cargo" ]; then
+    cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin/cargo"
+    PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
     export PATH
   else
     log_warn "cargo not found — cannot build context-manager"

@@ -77,7 +77,7 @@ portable_install() {
     log_ok "$tool already present in $(portable_bin)"
     return 0
   fi
-  if [ "$tool" = "rust" ] && { command -v cargo >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/cargo" ]; }; then
+  if [ "$tool" = "rust" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${CARGO_HOME:-$HOME/.cargo}/bin/cargo" ]; }; then
     log_ok "cargo already present"
     return 0
   fi

@@ -6,7 +6,7 @@ OMZ_INSTALL_URL="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/
 step_zsh() {
   local rc=0
 
-  if [ -d "$HOME/.oh-my-zsh" ]; then
+  if [ -d "${ZSH:-$HOME/.oh-my-zsh}" ]; then
     log_ok "oh-my-zsh already present"
   else
     # KEEP_ZSHRC stops the installer writing its own .zshrc over ours.

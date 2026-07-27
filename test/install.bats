@@ -26,6 +26,35 @@ EOF
   [[ "$output" == *"--only"* ]]
   [[ "$output" == *"--skip-fonts"* ]]
   [[ "$output" == *"--portable"* ]]
+  [[ "$output" == *"--data-root"* ]]
+}
+
+@test "--data-root points the relocatable tools at the given root" {
+  cat > "$REPO/install/00-preflight.sh" <<EOF
+#!/usr/bin/env bash
+step_preflight() {
+  echo "prefix=\$PORTABLE_PREFIX cargo=\$CARGO_HOME claude=\$CLAUDE_CONFIG_DIR" >> "$STUB_LOG"
+  return 0
+}
+EOF
+  run bash "$REPO/install.sh" --data-root "$TEST_TMP/ece"
+  stub_called "prefix=$TEST_TMP/ece"
+  stub_called "cargo=$TEST_TMP/ece/cargo"
+  stub_called "claude=$TEST_TMP/ece/claude"
+}
+
+@test "--data-root requires a directory argument" {
+  run bash "$REPO/install.sh" --data-root
+  [ "$status" -ne 0 ]
+}
+
+@test "without --data-root nothing is relocated" {
+  cat > "$REPO/install/00-preflight.sh" <<EOF
+#!/usr/bin/env bash
+step_preflight() { echo "prefix=\${PORTABLE_PREFIX:-unset}" >> "$STUB_LOG"; return 0; }
+EOF
+  run bash "$REPO/install.sh"
+  stub_called "prefix=unset"
 }
 
 @test "--portable exports PORTABLE_ONLY=1 to steps" {
