@@ -31,6 +31,21 @@ teardown() { teardown_common; }
   [[ "$output" == *"failures=1"* ]]
 }
 
+# 80-context-manager skips macOS entirely, so verifying its config there would
+# report a correct install as broken.
+@test "verify.sh skips the Linux-only context-manager checks on macOS" {
+  stub_command uname 0 "Darwin"
+  run bash "$DOTFILES_ROOT/verify.sh"
+  [[ "$output" == *"context-manager is Linux-only"* ]]
+  [[ "$output" != *"config.toml exists"* ]]
+}
+
+@test "verify.sh runs the context-manager checks on Linux" {
+  stub_command uname 0 "Linux"
+  run bash "$DOTFILES_ROOT/verify.sh"
+  [[ "$output" == *"config.toml exists"* ]]
+}
+
 @test "verify.sh counts the summary line as a failure report" {
   run bash "$DOTFILES_ROOT/verify.sh"
   [[ "$output" == *"check(s) failed"* ]]

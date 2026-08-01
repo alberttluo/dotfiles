@@ -16,6 +16,14 @@ _displace() {
   fi
 }
 
+# For destinations an external tool must own as a regular file. A previous
+# install may have linked them, and a link left in place would send that tool's
+# writes into this repo — or fail outright, as OMC's coordinator does.
+unlink_if_symlink() {
+  [ -L "$1" ] || return 0
+  _displace "$1"
+}
+
 backup_and_link() {
   local src=$1 dest=$2
 

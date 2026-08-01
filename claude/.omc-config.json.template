@@ -15,7 +15,6 @@
     }
   },
   "setupCompleted": "2026-06-11T17:35:32.752Z",
-  "setupVersion": "v4.15.4",
   "configType": "global",
   "nodeBinary": "@@NODE_BINARY@@"
 }

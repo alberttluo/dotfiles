@@ -153,6 +153,12 @@ _settings_is_copy() {
   [ -f "$CLAUDE_DIR/settings.json" ] && [ ! -L "$CLAUDE_DIR/settings.json" ]
 }
 
+# oh-my-claudecode's setup coordinator refuses to write through a symlink, so a
+# linked CLAUDE.md silently breaks every future /oh-my-claudecode:setup.
+_claude_md_writable_by_omc() {
+  [ -f "$CLAUDE_DIR/CLAUDE.md" ] && [ ! -L "$CLAUDE_DIR/CLAUDE.md" ]
+}
+
 _omc_node_ok() {
   local n
   n="$(jq -r '.nodeBinary' "$CLAUDE_DIR/.omc-config.json" 2>/dev/null)"
@@ -196,7 +202,9 @@ printf '\n──────── claude code ────────\n'
 check "claude CLI is installed"                     command -v claude
 check "settings.json is a copy, not a repo symlink"  _settings_is_copy
 check "settings.json is valid JSON"                 jq -e . "$CLAUDE_DIR/settings.json"
-check "CLAUDE.md is linked"                         test -L "$CLAUDE_DIR/CLAUDE.md"
+check "CLAUDE-user.md is linked"                    test -L "$CLAUDE_DIR/CLAUDE-user.md"
+check "CLAUDE.md is a real file OMC can rewrite"    _claude_md_writable_by_omc
+check "CLAUDE.md imports CLAUDE-user.md"            grep -q '^@CLAUDE-user\.md$' "$CLAUDE_DIR/CLAUDE.md"
 check "hud script is executable"                    test -x "$CLAUDE_DIR/hud/omc-hud-cache.sh"
 check ".omc-config.json node path is valid"         _omc_node_ok
 check "all 59 manifest skills are linked"           _skills_linked
@@ -204,18 +212,26 @@ check "pdf is not linked into Claude Code"          test '!' -e "$CLAUDE_DIR/ski
 check "no machine state is linked"                  _no_state_linked
 
 printf '\n──────── context-manager ────────\n'
-check "config.toml exists"                          test -f "$CM_CONFIG"
-check "config.toml parses as TOML"                  _cm_config_parses
-check "cwd exclusions are configured"               grep -q '^ignore_cwds = \[' "$CM_CONFIG"
+# The hooks live in the tracked settings on both platforms, so this one always
+# applies — they are written to no-op when the binary is absent.
 check "cm-hook is wired into settings.json"         _cm_hook_wired
-# Reported, not required: the daemon is built from a separate repo, so a machine
-# can be fully provisioned by this installer and still not run it.
-if [ -x "$BIN_DIR/context-managerd" ]; then
-  check "context-managerd is installed"             test -x "$BIN_DIR/context-managerd"
-  check "cm-hook is installed"                      test -x "$BIN_DIR/cm-hook"
-  check "the service is active"                     systemctl --user is-active --quiet context-manager
+# Everything else is Linux-only, matching 80-context-manager, which skips the
+# whole step on macOS. Asserting it there reports a correct install as broken.
+if [ "$(uname -s)" = "Darwin" ]; then
+  printf '  · context-manager is Linux-only (systemd --user) — skipped\n'
 else
-  printf '  · context-manager daemon not installed (optional) — skipped\n'
+  check "config.toml exists"                        test -f "$CM_CONFIG"
+  check "config.toml parses as TOML"                _cm_config_parses
+  check "cwd exclusions are configured"             grep -q '^ignore_cwds = \[' "$CM_CONFIG"
+  # Reported, not required: the daemon is built from a separate repo, so a
+  # machine can be fully provisioned by this installer and still not run it.
+  if [ -x "$BIN_DIR/context-managerd" ]; then
+    check "context-managerd is installed"           test -x "$BIN_DIR/context-managerd"
+    check "cm-hook is installed"                    test -x "$BIN_DIR/cm-hook"
+    check "the service is active"                   systemctl --user is-active --quiet context-manager
+  else
+    printf '  · context-manager daemon not installed (optional) — skipped\n'
+  fi
 fi
 
 printf '\n'

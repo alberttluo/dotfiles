@@ -97,11 +97,25 @@ permission prompts enabled.
 
 | Installed by | Files | Why |
 |---|---|---|
-| symlink | `.zshrc`, `.zshenv`, `tmux.conf.local`, `config/nvim`, `CLAUDE.md` | Author-edited only. Edits in the repo take effect immediately. |
+| symlink | `.zshrc`, `.zshenv`, `tmux.conf.local`, `config/nvim`, `CLAUDE-user.md` | Author-edited only. Edits in the repo take effect immediately. |
 | copy | `claude/settings.json`, `claude/hud/` | **The application writes to these.** Claude Code persists theme, model, and permission state into `settings.json`; the HUD writes per-session cache into `hud/cache/`. Symlinking them makes the repo the write target for runtime state — which silently re-added a per-host permission bypass to this repo once. |
+| generated | `~/.claude/CLAUDE.md` | oh-my-claudecode rewrites it on every release, and its setup coordinator **refuses to write through a symlink**. Not tracked at all. |
 
 Changing a copied file in the repo needs `./install.sh --only 60-claude` to take
 effect. That is the deliberate cost of keeping runtime writes out of git.
+
+### CLAUDE.md is split in two
+
+`~/.claude/CLAUDE.md` is owned by oh-my-claudecode, not by this repo. It holds
+OMC's generated block plus one line — `@CLAUDE-user.md` — importing the personal
+instructions, which *are* tracked here and symlinked into place. OMC regenerates
+its own block and preserves everything below it, so `/oh-my-claudecode:setup`
+updates itself with no merging by hand and no risk to the tracked file.
+
+`60-claude` also runs OMC's `setup-claude-md.sh` itself, so a plain
+`./install.sh` refreshes the generated block too. On a brand-new machine the OMC
+plugin is not cached until Claude Code first launches; the step warns and leaves
+the import in place, and the next `/oh-my-claudecode:setup` fills in the rest.
 
 ## What gets installed
 
@@ -112,7 +126,7 @@ effect. That is the deliberate cost of keeping runtime writes out of git.
 | zsh | oh-my-zsh, `robbyrussell`, `plugins=(git)` |
 | tmux | oh-my-tmux pinned to `af33f07`, tpm, tmux-agent-indicator, extrakto |
 | Neovim | NvChad v2.5, plugins restored from `lazy-lock.json` |
-| Claude Code | CLI, `settings.json`, `CLAUDE.md`, OMC HUD, 61 skills (59 linked) |
+| Claude Code | CLI, `settings.json`, `CLAUDE-user.md`, OMC HUD, 61 skills (59 linked) |
 | context-manager | `config.toml`, plus the daemon itself: cloned and built from its own repo (Linux only) |
 
 Backups of anything displaced go to `~/.dotfiles-backup/<timestamp>/`. Nothing is
@@ -172,7 +186,7 @@ excludes every project beneath it.
 | `install/` | One file per step, `00-preflight` through `80-context-manager` |
 | `home/` | zsh config plus the per-host example |
 | `config/` | tmux, Neovim, and context-manager config |
-| `claude/` | Claude Code settings, CLAUDE.md, HUD |
+| `claude/` | Claude Code settings, personal CLAUDE-user.md, HUD |
 | `agents/` | Vendored skills tree, lock file, link manifest |
 | `test/` | bats suites, Rocky 9 integration test |
 | `docs/superpowers/` | Design spec and implementation plan |
@@ -190,11 +204,15 @@ shellcheck -x install.sh verify.sh lib/*.sh install/*.sh
 ./test/run-container-test.sh      # full install on rockylinux:9 (needs docker)
 ```
 
-**macOS is not covered by an automated test** — no Mac was available to the
-author. macOS support rests on shellcheck and review of the three
-platform-divergent branches: the Homebrew prefix (`/opt/homebrew` vs
-`/usr/local`), the font destination (`~/Library/Fonts`), and whether `fc-cache`
-runs. Use `--dry-run` on a Mac first.
+The suite is host-independent: every test that exercises a platform-divergent
+branch pins `uname` rather than inheriting the developer's kernel. That matters
+more than it sounds — `80-context-manager` returns early on macOS, so its ten
+Linux-path tests passed vacuously on a Mac until they were pinned.
+
+`bats test/` and `./verify.sh` both pass on macOS 26 (Apple Silicon) against a
+real install. The platform-divergent branches are the Homebrew prefix (`/opt/homebrew`
+vs `/usr/local`), the font destination (`~/Library/Fonts`), whether `fc-cache`
+runs, and whether context-manager installs at all.
 
 ## Remote
 

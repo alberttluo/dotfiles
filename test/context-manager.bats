@@ -2,6 +2,10 @@
 
 load helper
 
+# `run !` below is only honoured as a negation from bats 1.5.0 on; older
+# releases would treat the assertion as vacuously true.
+bats_require_minimum_version 1.5.0
+
 setup() {
   setup_common
   export BACKUP_DIR="$TEST_TMP/backup"
@@ -9,6 +13,10 @@ setup() {
   export XDG_CONFIG_HOME="$HOME/.config"
   export CM_SRC_DIR="$TEST_TMP/src/context-manager"
   export CM_REPO_URL="file:///dev/null/fake-remote"
+  # Pin the kernel. The step is a no-op on macOS, so without this every
+  # Linux-path test below silently passes without exercising anything when the
+  # suite runs on a Mac. The macOS test overrides this stub with its own.
+  stub_command uname 0 "Linux"
   # cargo must look present, or the step returns early before the source stage.
   stub_command cargo 0
   # The step reports on the service; keep it deterministic and offline.

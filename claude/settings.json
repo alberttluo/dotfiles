@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/alluo/.local/bin/cm-hook"
+            "command": "cm=\"${PORTABLE_PREFIX:-$HOME/.local}/bin/cm-hook\"; [ -x \"$cm\" ] && exec \"$cm\"; exit 0"
           }
         ]
       }
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/alluo/.local/bin/cm-hook"
+            "command": "cm=\"${PORTABLE_PREFIX:-$HOME/.local}/bin/cm-hook\"; [ -x \"$cm\" ] && exec \"$cm\"; exit 0"
           }
         ]
       }

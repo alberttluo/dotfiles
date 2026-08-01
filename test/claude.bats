@@ -29,6 +29,33 @@ claude_step() {
   ! grep -q '\.tmux/plugins/tmux-agent-indicator' "$DOTFILES_ROOT/claude/settings.json"
 }
 
+# A path baked in from the machine the settings were captured on fails on every
+# other machine, and does it once per session with no obvious cause.
+@test "packaged settings.json hardcodes no home directory" {
+  ! grep -qE '"/(home|Users)/' "$DOTFILES_ROOT/claude/settings.json"
+}
+
+# context-manager is Linux-only, so on macOS these hooks fire against a binary
+# that is never installed. They must no-op instead of erroring every session.
+@test "the cm-hook hooks tolerate a missing binary" {
+  local cmd
+  cmd="$(jq -r '.hooks.SessionEnd[0].hooks[0].command' "$DOTFILES_ROOT/claude/settings.json")"
+  run env -u PORTABLE_PREFIX HOME="$TEST_TMP/nowhere" sh -c "$cmd"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "the cm-hook hooks run the binary when it is installed" {
+  local cmd
+  cmd="$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$DOTFILES_ROOT/claude/settings.json")"
+  mkdir -p "$TEST_TMP/prefix/bin"
+  printf '#!/usr/bin/env bash\necho ran-cm-hook\n' > "$TEST_TMP/prefix/bin/cm-hook"
+  chmod +x "$TEST_TMP/prefix/bin/cm-hook"
+  run env PORTABLE_PREFIX="$TEST_TMP/prefix" sh -c "$cmd"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ran-cm-hook" ]
+}
+
 @test "packaged settings.json omits the skip-permissions bypass" {
   run jq -e 'has("skipDangerousModePermissionPrompt")' "$DOTFILES_ROOT/claude/settings.json"
   [ "$status" -ne 0 ]
@@ -51,13 +78,97 @@ claude_step() {
   ! grep -q '/home/alluo/.nvm' "$DOTFILES_ROOT/claude/.omc-config.json.template"
 }
 
-@test "step_claude links CLAUDE.md but COPIES settings.json" {
+# setupCompleted stays: it is what makes OMC skip its wizard on a fresh machine.
+# setupVersion does not, because the step rewrites this file on every run and a
+# tracked version string would reinstate a stale one after each OMC release.
+@test "the omc template pins no oh-my-claudecode version" {
+  run jq -e 'has("setupVersion")' "$DOTFILES_ROOT/claude/.omc-config.json.template"
+  [ "$status" -ne 0 ]
+  run jq -e '.setupCompleted' "$DOTFILES_ROOT/claude/.omc-config.json.template"
+  [ "$status" -eq 0 ]
+}
+
+@test "step_claude links CLAUDE-user.md but COPIES settings.json" {
   stub_command claude 0 "1.0.0"
   stub_command npm 0
   run claude_step "step_claude"
-  [ -L "$HOME/.claude/CLAUDE.md" ]
+  [ -L "$HOME/.claude/CLAUDE-user.md" ]
   [ -f "$HOME/.claude/settings.json" ]
   [ ! -L "$HOME/.claude/settings.json" ]
+}
+
+@test "step_claude leaves CLAUDE.md a real file importing CLAUDE-user.md" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  run claude_step "step_claude"
+  [ -f "$HOME/.claude/CLAUDE.md" ]
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -q '^@CLAUDE-user\.md$' "$HOME/.claude/CLAUDE.md"
+}
+
+@test "an install that previously linked CLAUDE.md is migrated, not written through" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  mkdir -p "$HOME/.claude"
+  printf 'tracked content\n' > "$TEST_TMP/repo-claude-md"
+  ln -s "$TEST_TMP/repo-claude-md" "$HOME/.claude/CLAUDE.md"
+  run claude_step "step_claude"
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  # the old link target must not have been appended to through the link
+  run grep -c '@CLAUDE-user\.md' "$TEST_TMP/repo-claude-md"
+  [ "$output" = "0" ]
+}
+
+@test "install_claude_md does not duplicate the import on re-run" {
+  stub_command claude 0 "1.0.0"
+  stub_command npm 0
+  run claude_step "step_claude"
+  run claude_step "step_claude"
+  run grep -c '^@CLAUDE-user\.md$' "$HOME/.claude/CLAUDE.md"
+  [ "$output" = "1" ]
+}
+
+@test "install_claude_md preserves an existing OMC block when adding the import" {
+  mkdir -p "$HOME/.claude"
+  printf '<!-- OMC:START -->\n# managed\n<!-- OMC:END -->\n' > "$HOME/.claude/CLAUDE.md"
+  run claude_step "install_claude_md '$HOME/.claude'"
+  grep -q '<!-- OMC:START -->' "$HOME/.claude/CLAUDE.md"
+  grep -q '^@CLAUDE-user\.md$' "$HOME/.claude/CLAUDE.md"
+}
+
+@test "install_claude_md under DRY_RUN writes nothing and claims nothing" {
+  mkdir -p "$HOME/.claude/plugins/cache/omc/oh-my-claudecode/4.15.7/scripts"
+  printf '#!/usr/bin/env bash\nexit 0\n' \
+    > "$HOME/.claude/plugins/cache/omc/oh-my-claudecode/4.15.7/scripts/setup-claude-md.sh"
+  chmod +x "$HOME/.claude/plugins/cache/omc/oh-my-claudecode/4.15.7/scripts/setup-claude-md.sh"
+  run claude_step "DRY_RUN=1 install_claude_md '$HOME/.claude'"
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.claude/CLAUDE.md" ]
+  [[ "$output" == *"would run"* ]]
+  [[ "$output" != *"refreshed"* ]]
+}
+
+@test "install_claude_md warns rather than failing when OMC is not installed yet" {
+  mkdir -p "$HOME/.claude"
+  run claude_step "install_claude_md '$HOME/.claude'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not installed yet"* ]]
+}
+
+@test "install_claude_md runs the OMC setup script when the plugin is cached" {
+  local cache="$HOME/.claude/plugins/cache/omc/oh-my-claudecode"
+  mkdir -p "$HOME/.claude" "$cache/4.9.0/scripts" "$cache/4.15.7/scripts"
+  for v in 4.9.0 4.15.7; do
+    cat > "$cache/$v/scripts/setup-claude-md.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "$v" > "\$HOME/.omc-setup-ran"
+EOF
+    chmod +x "$cache/$v/scripts/setup-claude-md.sh"
+  done
+  run claude_step "install_claude_md '$HOME/.claude'"
+  [ "$status" -eq 0 ]
+  # newest cached version wins, not lexicographic order
+  [ "$(cat "$HOME/.omc-setup-ran")" = "4.15.7" ]
 }
 
 @test "Claude Code writing to settings.json cannot modify the repo" {
@@ -151,6 +262,7 @@ claude_step_without_cli() {
   stub_command node 0
   run claude_step "CLAUDE_CONFIG_DIR='$CLAUDE_CONFIG_DIR' step_claude 2>&1"
   [ -f "$CLAUDE_CONFIG_DIR/settings.json" ]
-  [ -L "$CLAUDE_CONFIG_DIR/CLAUDE.md" ]
+  [ -L "$CLAUDE_CONFIG_DIR/CLAUDE-user.md" ]
+  [ -f "$CLAUDE_CONFIG_DIR/CLAUDE.md" ]
   [ ! -d "$HOME/.claude" ]
 }
