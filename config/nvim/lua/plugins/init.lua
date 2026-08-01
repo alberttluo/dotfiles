@@ -38,6 +38,14 @@ return {
 
   {
     "nvim-treesitter/nvim-treesitter",
+    -- Pinned, because nothing else pins it and the wrong branch is silently
+    -- installable. master was archived at v0.10.0 and does not support Neovim
+    -- 0.11+: its `set-lang-from-info-string!` directive indexes a match as one
+    -- node per capture, but matches hold a list of nodes now, so every markdown
+    -- buffer throws "attempt to call method 'range' (a nil value)" out of the
+    -- conceal_line decoration provider. NvChad also calls
+    -- require("nvim-treesitter").install(), which only exists on main.
+    branch = "main",
     opts = function(_, opts)
       opts.ensure_installed = opts.ensure_installed or {}
       vim.list_extend(opts.ensure_installed, { "markdown", "markdown_inline" })

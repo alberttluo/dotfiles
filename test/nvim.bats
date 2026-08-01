@@ -25,6 +25,17 @@ nvim_step() {
   [ "$status" -eq 0 ]
 }
 
+# nvim-treesitter's master branch was archived at v0.10.0 and does not support
+# Neovim 0.11+; NvChad also calls require("nvim-treesitter").install(), which
+# exists only on main. Nothing else pins the branch, so a lazy update that
+# resolves the repo default is enough to strand the checkout on master and throw
+# on every markdown buffer.
+@test "nvim-treesitter is pinned to the main branch in both spec and lockfile" {
+  grep -q 'branch = "main"' "$DOTFILES_ROOT/config/nvim/lua/plugins/init.lua"
+  run jq -r '."nvim-treesitter".branch' "$DOTFILES_ROOT/config/nvim/lazy-lock.json"
+  [ "$output" = "main" ]
+}
+
 @test "the vendored nvim config carries the custom tabline" {
   [ -f "$DOTFILES_ROOT/config/nvim/lua/albert/tabline.lua" ]
 }
