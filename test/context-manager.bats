@@ -73,6 +73,19 @@ EOF
   grep -q '"/mnt/c/Users/Albert Luo"' "$DOTFILES_ROOT/config/context-manager/config.toml"
 }
 
+# The daemon infers the context window from the model id it reads out of the
+# transcript, and Claude Code writes the 1M Opus variant there as plain
+# "claude-opus-5" — the [1m] of the model pin below never reaches the file. An
+# explicit window entry is therefore the only way the daemon can tell a 1M
+# session from the 200k default, and getting it wrong is not a near miss: a
+# handoff at 45% of an assumed 200k fires at 9% of the real window, and the
+# daemon's empirical correction cannot save it because the session is retired
+# long before it is ever observed above 200k.
+@test "every model the config pins has a matching context window" {
+  grep -q '"model": "opus\[1m\]"' "$DOTFILES_ROOT/claude/settings.json"
+  grep -qE '^"claude-opus-5" = 1000000$' "$DOTFILES_ROOT/config/context-manager/config.toml"
+}
+
 @test "step seeds the config when none exists" {
   stub_git_clone
   run cm_step "step_context_manager"

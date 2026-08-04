@@ -31,9 +31,26 @@ ignore_cwds = [
   "/mnt/c/Users/Albert Luo",
 ]
 
-# Context window per model. `default` applies to anything unlisted; the daemon
-# also raises its estimate empirically when it observes a larger window in use.
+# Context window per model, keyed by the model id as it appears in the
+# transcript. `default` applies to anything unlisted.
+#
+# This table has to be updated whenever claude/settings.json changes its model
+# pin. That pin is "opus[1m]", but Claude Code records the model in the
+# transcript as plain "claude-opus-5" — the [1m] is dropped — so the id the
+# daemon sees carries no indication of which window is in use, and an entry here
+# is the only thing that can tell it.
+#
+# Under-stating the window is not a near miss. At the 200k default a 1M session
+# is handed off at 45% of 200k, i.e. 9% of the context it actually has. The
+# daemon does raise its estimate empirically once it observes usage above the
+# configured window, but that cannot rescue this case: the session is retired at
+# 90k tokens and so is never observed above 200k.
+#
+# Sonnet is deliberately left on the default: it is not pinned here, and
+# over-stating a window is the worse error — the session runs out of context for
+# real before a handoff is ever attempted.
 [model_windows]
 default = 200000
+"claude-opus-5" = 1000000
 "claude-opus-4-8" = 1000000
 "claude-opus-4-7" = 1000000
