@@ -5,10 +5,14 @@ Portable tmux + zsh + Neovim + Claude Code setup for macOS and Red Hat Linux.
 ## Install
 
 ```bash
-git clone <this repo> ~/dotfiles
+git clone --recursive <this repo> ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```
+
+`--recursive` brings in `vendor/context-manager`. Forgetting it is not fatal —
+the install checks the submodule out itself — but it costs a network round trip
+mid-install.
 
 Then, because neither can be automated:
 
@@ -59,7 +63,7 @@ run. Everything else moves:
 | `oh-my-zsh/`, `nvm/` | shell and node frameworks |
 | `claude/` | Claude Code config **and** its transcripts, which grow without bound |
 | `agents/` | the 61-skill tree |
-| `src/context-manager/` | the daemon checkout and its Rust build output |
+| `cargo-target/` | `CARGO_TARGET_DIR`: the daemon's Rust build output |
 
 What stays in `$HOME`: `.zshrc`, `.zshenv`, `.zshrc.local`, `.config/nvim` (a
 symlink into this repo), `.config/context-manager/config.toml`, and
@@ -127,7 +131,7 @@ the import in place, and the next `/oh-my-claudecode:setup` fills in the rest.
 | tmux | oh-my-tmux pinned to `af33f07`, tpm, tmux-agent-indicator, extrakto |
 | Neovim | NvChad v2.5, plugins restored from `lazy-lock.json` |
 | Claude Code | CLI, `settings.json`, `CLAUDE-user.md`, OMC HUD, 61 skills (59 linked) |
-| context-manager | `config.toml`, plus the daemon itself: cloned and built from its own repo (Linux only) |
+| context-manager | `config.toml`, plus the daemon itself: built from the `vendor/context-manager` submodule (Linux only) |
 
 Backups of anything displaced go to `~/.dotfiles-backup/<timestamp>/`. Nothing is
 ever deleted or overwritten in place.
@@ -152,17 +156,29 @@ live session to write a handoff document, then replaces it in the same tmux pane
 with a new session seeded from that document.
 
 This is the one component built from source. The `context-managerd` and `cm-hook`
-binaries are Rust and live in their own repo, so the step clones (or
-fast-forwards) that repo into `~/src/context-manager` and delegates to its
-`deploy/install.sh`, which builds, installs the binaries, and enables the
-systemd user service. Delegating rather than reimplementing keeps the two from
-drifting. Override the source location with `CM_SRC_DIR` and the origin with
-`CM_REPO_URL`.
+binaries are Rust and live in their own repo, vendored here as the submodule
+`vendor/context-manager`. The step delegates to its `deploy/install.sh`, which
+builds, installs the binaries, and enables the systemd user service. Delegating
+rather than reimplementing keeps the two from drifting.
+
+A submodule rather than a clone into `~/src` so that the daemon a given dotfiles
+commit installs is pinned by that commit. Installing never moves the pin;
+updating the daemon is deliberate:
+
+```bash
+git submodule update --remote vendor/context-manager
+git commit -m 'chore: bump context-manager' vendor/context-manager
+```
+
+The source is small enough to sit in `$HOME`, but its build output is not, so
+`--data-root` sets `CARGO_TARGET_DIR` and cargo writes there instead of into
+`vendor/context-manager/target`.
 
 That makes `cargo` a build dependency, so the Brewfile now carries `rust` (a
 rustup toolchain already on the machine is preferred and used instead). A missing
-toolchain or an unreachable remote is reported as a follow-up, not a hard
-failure: the config is still seeded and the rest of the install completes.
+toolchain or a submodule that cannot be checked out is reported as a follow-up,
+not a hard failure: the config is still seeded and the rest of the install
+completes.
 
 The step is **Linux-only** — the daemon runs as a `systemd --user` service, which
 macOS has no equivalent of — and is a clean no-op on macOS. The

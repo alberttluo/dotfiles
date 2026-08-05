@@ -3,10 +3,16 @@
 # before it exhausts its context window.
 #
 # Unlike every other step, this one builds from source: the daemon is Rust and
-# lives in its own repo, so this step clones (or updates) it and delegates to its
-# deploy/install.sh, which is the only thing that knows the full sequence —
-# build, install binaries, wire the Claude hooks, enable the systemd user
-# service. Duplicating that here would guarantee the two drift apart.
+# lives in its own repo, vendored here as the submodule vendor/context-manager.
+# The step delegates to its deploy/install.sh, which is the only thing that knows
+# the full sequence — build, install binaries, wire the Claude hooks, enable the
+# systemd user service. Duplicating that here would guarantee the two drift apart.
+#
+# A submodule rather than a clone into ~/src so the daemon a given dotfiles
+# commit installs is pinned by that commit, and `git clone --recursive` is the
+# whole install. Updating the daemon is therefore a deliberate act — `git
+# submodule update --remote vendor/context-manager` and commit the new pin — not
+# something an install silently does underneath you.
 #
 # Linux-only: the daemon runs as a systemd --user service, which macOS has no
 # equivalent of. On macOS the step is a clean no-op.
@@ -18,15 +24,14 @@
 # *before* delegating, so the upstream installer finds a config and does not
 # write its own dry_run=true default over it.
 
-CM_REPO_URL_DEFAULT="git@github.com:alberttluo/context-manager.git"
+CM_SUBMODULE_PATH="vendor/context-manager"
 
 step_context_manager() {
   local rc=0
   local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/context-manager"
   local src="$DOTFILES_ROOT/config/context-manager/config.toml"
   local dest="$config_dir/config.toml"
-  local repo_url="${CM_REPO_URL:-$CM_REPO_URL_DEFAULT}"
-  local src_dir="${CM_SRC_DIR:-$HOME/src/context-manager}"
+  local src_dir="$DOTFILES_ROOT/$CM_SUBMODULE_PATH"
   local cargo_bin
 
   if [ "$(detect_os)" = "macos" ]; then
@@ -68,28 +73,24 @@ step_context_manager() {
   log_ok "cargo found: $cargo_bin"
 
   # 3. Source ------------------------------------------------------------------
-  if [ -d "$src_dir/.git" ]; then
-    # --ff-only so local commits are never silently discarded; a diverged or
-    # dirty checkout is reported and built as-is.
-    if run git -C "$src_dir" pull --ff-only --quiet; then
-      log_ok "updated $src_dir"
-    else
-      log_warn "could not fast-forward $src_dir — building the existing checkout"
-      rc=2
-    fi
-  else
-    run mkdir -p "$(dirname "$src_dir")"
-    if ! run git clone --quiet "$repo_url" "$src_dir"; then
-      log_fail "could not clone $repo_url"
-      log_followup "clone context-manager manually to $src_dir, then: ./install.sh --only 80-context-manager"
+  # A plain (non-recursive) clone leaves the submodule directory empty, so check
+  # for real content rather than the directory itself. Already-populated is the
+  # common case and must stay silent — the pin is whatever the dotfiles commit
+  # says, and this step deliberately does not move it.
+  if [ ! -e "$src_dir/deploy/install.sh" ]; then
+    if ! run git -C "$DOTFILES_ROOT" submodule update --init --quiet -- "$CM_SUBMODULE_PATH"; then
+      log_fail "could not check out the $CM_SUBMODULE_PATH submodule"
+      log_followup "git -C $DOTFILES_ROOT submodule update --init -- $CM_SUBMODULE_PATH, then: ./install.sh --only 80-context-manager"
       return 2
     fi
-    log_ok "cloned $repo_url -> $src_dir"
+    log_ok "checked out $CM_SUBMODULE_PATH"
+  else
+    log_ok "$CM_SUBMODULE_PATH is present at its pinned commit"
   fi
 
   # 4. Build, install, and start ----------------------------------------------
-  # Checked after the dry-run return: under DRY_RUN nothing was cloned, so the
-  # deploy script legitimately is not there yet.
+  # Checked after the dry-run return: under DRY_RUN the submodule was never
+  # checked out, so the deploy script legitimately may not be there yet.
   if [ "${DRY_RUN:-0}" = "1" ]; then
     log_dry "bash $src_dir/deploy/install.sh (build + install binaries + systemd service)"
     return $rc

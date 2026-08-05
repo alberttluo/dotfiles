@@ -11,8 +11,13 @@ setup() {
   export BACKUP_DIR="$TEST_TMP/backup"
   mkdir -p "$BACKUP_DIR"
   export XDG_CONFIG_HOME="$HOME/.config"
-  export CM_SRC_DIR="$TEST_TMP/src/context-manager"
-  export CM_REPO_URL="file:///dev/null/fake-remote"
+  # The step builds from a submodule inside the repo it is run from. Point it at
+  # a stand-in so exercising it never touches the real vendor/context-manager
+  # checkout and never triggers a real cargo build.
+  export FAKE_ROOT="$TEST_TMP/dotfiles"
+  mkdir -p "$FAKE_ROOT/config/context-manager"
+  cp "$DOTFILES_ROOT/config/context-manager/config.toml" \
+     "$FAKE_ROOT/config/context-manager/config.toml"
   # Pin the kernel. The step is a no-op on macOS, so without this every
   # Linux-path test below silently passes without exercising anything when the
   # suite runs on a Mac. The macOS test overrides this stub with its own.
@@ -29,9 +34,8 @@ cm_step() {
     source '$DOTFILES_ROOT/lib/log.sh'
     source '$DOTFILES_ROOT/lib/os.sh'
     source '$DOTFILES_ROOT/lib/link.sh'
-    export DOTFILES_ROOT='$DOTFILES_ROOT' BACKUP_DIR='$BACKUP_DIR'
+    export DOTFILES_ROOT='$FAKE_ROOT' BACKUP_DIR='$BACKUP_DIR'
     export XDG_CONFIG_HOME='$XDG_CONFIG_HOME'
-    export CM_SRC_DIR='$CM_SRC_DIR' CM_REPO_URL='$CM_REPO_URL'
     source '$DOTFILES_ROOT/install/80-context-manager.sh'
     $1
   "
@@ -39,20 +43,29 @@ cm_step() {
 
 config_dest() { printf '%s/context-manager/config.toml' "$XDG_CONFIG_HOME"; }
 
-# A stub `git` whose `clone` materialises a checkout carrying a fake
-# deploy/install.sh, so the orchestration is exercised without a real build.
-stub_git_clone() {
+# Materialise a checked-out submodule carrying a fake deploy/install.sh, so the
+# orchestration is exercised without a real build.
+fake_submodule() {
   local deploy_exit=${1:-0}
-  cat > "$STUB_BIN/git" <<EOF
-#!/usr/bin/env bash
-echo "git \$*" >> "$STUB_LOG"
-if [ "\$1" = "clone" ]; then
-  dest="\${@: -1}"
-  mkdir -p "\$dest/.git" "\$dest/deploy"
-  cat > "\$dest/deploy/install.sh" <<'INNER'
+  mkdir -p "$FAKE_ROOT/vendor/context-manager/deploy"
+  cat > "$FAKE_ROOT/vendor/context-manager/deploy/install.sh" <<EOF
 #!/usr/bin/env bash
 echo "deploy-ran" >> "$TEST_TMP/deploy.log"
 exit $deploy_exit
+EOF
+}
+
+# A stub git whose `submodule update` materialises the checkout, standing in for
+# a repo cloned without --recursive.
+stub_git_submodule() {
+  cat > "$STUB_BIN/git" <<EOF
+#!/usr/bin/env bash
+echo "git \$*" >> "$STUB_LOG"
+if [ "\$3" = "submodule" ]; then
+  mkdir -p "$FAKE_ROOT/vendor/context-manager/deploy"
+  cat > "$FAKE_ROOT/vendor/context-manager/deploy/install.sh" <<'INNER'
+#!/usr/bin/env bash
+echo "deploy-ran" >> "$TEST_TMP/deploy.log"
 INNER
 fi
 exit 0
@@ -86,15 +99,25 @@ EOF
   grep -qE '^"claude-opus-5" = 1000000$' "$DOTFILES_ROOT/config/context-manager/config.toml"
 }
 
+@test "the daemon is vendored as a submodule, not fetched at install time" {
+  grep -q 'path = vendor/context-manager' "$DOTFILES_ROOT/.gitmodules"
+  grep -q 'url = .*context-manager' "$DOTFILES_ROOT/.gitmodules"
+  # The pin is the point: nothing the step *runs* may reach for a moving branch.
+  # Comments are stripped first — the header legitimately mentions both, since
+  # `git clone --recursive` is now how the daemon arrives.
+  run ! bash -c "grep -v '^[[:space:]]*#' '$DOTFILES_ROOT/install/80-context-manager.sh' \
+                 | grep -qE 'git clone|pull --ff-only'"
+}
+
 @test "step seeds the config when none exists" {
-  stub_git_clone
+  fake_submodule
   run cm_step "step_context_manager"
   [ -f "$(config_dest)" ]
   cmp -s "$DOTFILES_ROOT/config/context-manager/config.toml" "$(config_dest)"
 }
 
 @test "step leaves a hand-tuned config untouched and warns about drift" {
-  stub_git_clone
+  fake_submodule
   mkdir -p "$XDG_CONFIG_HOME/context-manager"
   printf 'threshold = 0.99\n' > "$(config_dest)"
   run cm_step "step_context_manager"
@@ -103,51 +126,42 @@ EOF
   [[ "$output" == *"differs from the tracked copy"* ]]
 }
 
-@test "step clones the repo and runs its deploy installer" {
-  stub_git_clone
+@test "step runs the submodule's deploy installer" {
+  fake_submodule
   run cm_step "step_context_manager"
-  stub_called "git clone"
   [ -f "$TEST_TMP/deploy.log" ]
   [[ "$output" == *"built and deployed"* ]]
 }
 
 @test "step seeds the config BEFORE building, so the upstream default cannot win" {
-  # The fake deploy script would write a dry_run=true config if none existed;
+  # The real deploy script would write a dry_run=true config if none existed;
   # assert ours is already in place by the time it runs.
-  cat > "$STUB_BIN/git" <<EOF
-#!/usr/bin/env bash
-echo "git \$*" >> "$STUB_LOG"
-if [ "\$1" = "clone" ]; then
-  dest="\${@: -1}"; mkdir -p "\$dest/.git" "\$dest/deploy"
-  cat > "\$dest/deploy/install.sh" <<'INNER'
+  mkdir -p "$FAKE_ROOT/vendor/context-manager/deploy"
+  cat > "$FAKE_ROOT/vendor/context-manager/deploy/install.sh" <<EOF
 #!/usr/bin/env bash
 grep -q 'threshold' "$(config_dest)" && echo "config-present-first" >> "$TEST_TMP/order.log"
-INNER
-fi
-exit 0
 EOF
-  chmod +x "$STUB_BIN/git"
   run cm_step "step_context_manager"
   [ -f "$TEST_TMP/order.log" ]
 }
 
-@test "step updates an existing checkout with --ff-only instead of cloning" {
-  mkdir -p "$CM_SRC_DIR/.git" "$CM_SRC_DIR/deploy"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$CM_SRC_DIR/deploy/install.sh"
-  stub_command git 0
+@test "step checks out the submodule when the clone was not recursive" {
+  stub_git_submodule
   run cm_step "step_context_manager"
-  stub_called "pull --ff-only"
-  run ! stub_called "git clone"
+  stub_called "submodule update --init"
+  [ -f "$TEST_TMP/deploy.log" ]
+  [[ "$output" == *"checked out vendor/context-manager"* ]]
 }
 
-@test "step warns but still builds when the checkout cannot fast-forward" {
-  mkdir -p "$CM_SRC_DIR/.git" "$CM_SRC_DIR/deploy"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$CM_SRC_DIR/deploy/install.sh"
-  stub_command git 1
+# The pinned commit is the contract. An install that quietly moved it would put
+# a daemon on the machine that no dotfiles commit describes.
+@test "step leaves an already-checked-out submodule at its pinned commit" {
+  fake_submodule
+  stub_command git 0
   run cm_step "step_context_manager"
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"could not fast-forward"* ]]
-  [[ "$output" == *"built and deployed"* ]]
+  # Asserted before the next `run`, which would overwrite $output.
+  [[ "$output" == *"pinned commit"* ]]
+  run ! stub_called "submodule update"
 }
 
 @test "step reports a missing toolchain as a followup, not a hard failure" {
@@ -156,8 +170,8 @@ EOF
   run bash -c "
     source '$DOTFILES_ROOT/lib/log.sh'; source '$DOTFILES_ROOT/lib/os.sh'
     source '$DOTFILES_ROOT/lib/link.sh'
-    export DOTFILES_ROOT='$DOTFILES_ROOT' BACKUP_DIR='$BACKUP_DIR'
-    export XDG_CONFIG_HOME='$XDG_CONFIG_HOME' CM_SRC_DIR='$CM_SRC_DIR'
+    export DOTFILES_ROOT='$FAKE_ROOT' BACKUP_DIR='$BACKUP_DIR'
+    export XDG_CONFIG_HOME='$XDG_CONFIG_HOME'
     export PATH='$STUB_BIN:/usr/bin:/bin'
     export HOME='$TEST_TMP/nohome'; mkdir -p \"\$HOME\"
     source '$DOTFILES_ROOT/install/80-context-manager.sh'
@@ -167,28 +181,28 @@ EOF
   [[ "$output" == *"cargo not found"* ]]
 }
 
-@test "step fails clearly when the clone has no deploy installer" {
-  cat > "$STUB_BIN/git" <<EOF
-#!/usr/bin/env bash
-echo "git \$*" >> "$STUB_LOG"
-if [ "\$1" = "clone" ]; then mkdir -p "\${@: -1}/.git"; fi
-exit 0
-EOF
-  chmod +x "$STUB_BIN/git"
+@test "step fails clearly when the submodule checkout produced no installer" {
+  stub_command git 0
   run cm_step "step_context_manager"
   [ "$status" -eq 1 ]
   [[ "$output" == *"no deploy/install.sh"* ]]
 }
 
+@test "step surfaces a failing submodule checkout" {
+  stub_command git 1
+  run cm_step "step_context_manager"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"could not check out"* ]]
+}
+
 @test "step surfaces a failing deploy installer" {
-  stub_git_clone 1
+  fake_submodule 1
   run cm_step "step_context_manager"
   [ "$status" -eq 2 ]
   [[ "$output" == *"deploy/install.sh failed"* ]]
 }
 
 @test "step under DRY_RUN writes nothing and never builds" {
-  stub_git_clone
   run cm_step "DRY_RUN=1 step_context_manager"
   [ "$status" -eq 0 ]
   [ ! -f "$(config_dest)" ]

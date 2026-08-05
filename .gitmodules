@@ -1,0 +1,3 @@
+[submodule "vendor/context-manager"]
+	path = vendor/context-manager
+	url = git@github.com:alberttluo/context-manager.git

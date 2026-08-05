@@ -26,7 +26,7 @@ dataroot() {
   local var
   for var in XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME PORTABLE_PREFIX \
              CARGO_HOME RUSTUP_HOME ZSH NVM_DIR npm_config_cache \
-             CLAUDE_CONFIG_DIR CM_SRC_DIR; do
+             CLAUDE_CONFIG_DIR CARGO_TARGET_DIR; do
     [[ "$output" == *"$var=\"$ROOT"* ]] || {
       echo "$var is not under the root:"; echo "$output"; return 1
     }

@@ -39,7 +39,9 @@ data_root_exports() {
   printf 'export NVM_DIR="%s/nvm"\n' "$root"
   printf 'export npm_config_cache="%s/cache/npm"\n' "$root"
   printf 'export CLAUDE_CONFIG_DIR="%s/claude"\n' "$root"
-  printf 'export CM_SRC_DIR="%s/src/context-manager"\n' "$root"
+  # The context-manager source is a submodule inside this repo and is small
+  # enough to leave alone; its Rust build output is the part measured in GB.
+  printf 'export CARGO_TARGET_DIR="%s/cargo-target"\n' "$root"
   # shellcheck disable=SC2016  # $PATH must expand when the line runs, not here.
   printf 'export PATH="%s/bin:%s/cargo/bin:$PATH"\n' "$root" "$root"
 }
